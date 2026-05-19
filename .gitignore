@@ -1,0 +1,79 @@
+# Node
+node_modules/
+.env
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# VSCode
+.vscode/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+
+# Misc
+*.local
+*.cache
+*.tmp
+
+# Mac
+*.DS_Store
+
+# Coverage
+coverage/
+
+# Next.js
+.next/
+
+# Tailwind
+*.css.d.ts
+
+# Others
+*.swp
+*.swo
+
+# Ignore environment files
+.env*
+
+# Ignore IDE folders
+.idea/
+*.iml
+
+# Ignore test coverage
+coverage/
+
+# Ignore frontend build artifacts
+frontend/.next/
+frontend/out/
+
+# Ignore backend build artifacts
+backend/dist/
+backend/build/
+
+# Ignore lock files
+pnpm-lock.yaml
+yarn.lock
+
+# Ignore package manager logs
+*.log
+
+# Ignore test output
+junit.xml
+
+# Ignore backup files
+*~

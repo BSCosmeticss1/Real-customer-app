@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Digital Architect design system — deep teal on soft mint */
+@layer base {
+  :root {
+    --background: 180 30% 96%;
+    --foreground: 195 60% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 195 60% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 195 60% 12%;
+
+    /* deep teal */
+    --primary: 192 80% 14%;
+    --primary-foreground: 180 30% 96%;
+    --primary-glow: 188 60% 25%;
+
+    --secondary: 180 25% 92%;
+    --secondary-foreground: 192 80% 14%;
+
+    --muted: 180 20% 94%;
+    --muted-foreground: 195 15% 45%;
+
+    --accent: 165 35% 75%;
+    --accent-foreground: 192 80% 14%;
+
+    --success: 158 55% 35%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 158 40% 88%;
+
+    --warning: 35 90% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 70% 96%;
+
+    --border: 180 20% 88%;
+    --input: 180 20% 88%;
+    --ring: 192 80% 14%;
+
+    --radius: 0.875rem;
+
+    --sidebar-background: 180 28% 94%;
+    --sidebar-foreground: 195 40% 20%;
+    --sidebar-primary: 192 80% 14%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 100%;
+    --sidebar-accent-foreground: 192 80% 14%;
+    --sidebar-border: 180 20% 86%;
+    --sidebar-ring: 192 80% 14%;
+
+    --gradient-deep: linear-gradient(135deg, hsl(192 80% 14%), hsl(188 70% 22%));
+    --gradient-soft: linear-gradient(180deg, hsl(180 30% 97%), hsl(180 30% 94%));
+    --shadow-card: 0 1px 2px hsl(195 40% 20% / 0.04), 0 8px 24px -12px hsl(195 40% 20% / 0.08);
+    --shadow-deep: 0 20px 60px -20px hsl(192 80% 14% / 0.35);
+  }
+
+  .dark {
+    --background: 195 50% 8%;
+    --foreground: 180 30% 96%;
+    --card: 195 45% 11%;
+    --card-foreground: 180 30% 96%;
+    --popover: 195 45% 11%;
+    --popover-foreground: 180 30% 96%;
+    --primary: 180 30% 96%;
+    --primary-foreground: 192 80% 14%;
+    --secondary: 195 30% 16%;
+    --secondary-foreground: 180 30% 96%;
+    --muted: 195 30% 16%;
+    --muted-foreground: 180 15% 65%;
+    --accent: 195 30% 16%;
+    --accent-foreground: 180 30% 96%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 180 30% 96%;
+    --border: 195 30% 18%;
+    --input: 195 30% 18%;
+    --ring: 180 30% 96%;
+    --sidebar-background: 195 45% 10%;
+    --sidebar-foreground: 180 30% 92%;
+    --sidebar-primary: 180 30% 96%;
+    --sidebar-primary-foreground: 192 80% 14%;
+    --sidebar-accent: 195 30% 16%;
+    --sidebar-accent-foreground: 180 30% 96%;
+    --sidebar-border: 195 30% 18%;
+    --sidebar-ring: 180 30% 96%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  h1, h2, h3, .font-display {
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .text-display { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.02em; }
+  .label-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+}
