@@ -21,12 +21,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Title row */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="label-eyebrow text-primary">System Overview</div>
-          <h1 className="font-display text-5xl font-semibold text-foreground mt-2">Command Console</h1>
+          <h1 className="font-display text-3xl sm:text-5xl font-semibold text-foreground mt-2">Command Console</h1>
         </div>
-        <div className="text-right">
+        <div className="sm:text-right">
           <div className="label-eyebrow">System Health</div>
           <div className="flex items-center gap-2 mt-2">
             <span className="font-display text-xl text-foreground">Operational</span>
@@ -38,7 +38,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {stats.map((s) => {
           const Icon = s.icon;
           const danger = s.tone === "danger";
@@ -48,7 +48,7 @@ export default function Dashboard() {
                 <div className={`label-eyebrow ${danger ? "text-destructive" : ""}`}>{s.label}</div>
                 <Icon className={`h-7 w-7 ${danger ? "text-destructive/40" : "text-muted-foreground/40"}`} />
               </div>
-              <div className={`font-display text-5xl font-semibold mt-6 ${danger ? "text-destructive" : "text-foreground"}`}>{s.value}</div>
+              <div className={`font-display text-4xl sm:text-5xl font-semibold mt-6 ${danger ? "text-destructive" : "text-foreground"}`}>{s.value}</div>
               <div className={`mt-6 text-xs flex items-center gap-1.5 ${danger ? "text-destructive" : "text-muted-foreground"}`}>{s.foot}</div>
             </div>
           );
@@ -60,7 +60,7 @@ export default function Dashboard() {
         {/* Left col */}
         <div className="space-y-6">
           <div className="rounded-2xl bg-gradient-deep text-primary-foreground p-7 shadow-deep">
-            <h2 className="font-display text-3xl font-semibold">Quick Start</h2>
+            <h2 className="font-display text-2xl sm:text-3xl font-semibold">Quick Start</h2>
             <p className="text-primary-foreground/70 mt-2 text-sm leading-relaxed">Execute immediate actions or initialize new campaign nodes.</p>
             <div className="mt-6 space-y-3">
               <button className="w-full bg-card text-foreground rounded-xl py-4 font-medium flex items-center justify-center gap-3 hover:translate-y-[-1px] transition">
@@ -97,32 +97,32 @@ export default function Dashboard() {
 
         {/* Right col activity */}
         <div className="lg:col-span-2 rounded-2xl bg-card p-7 shadow-card relative overflow-hidden">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display text-3xl font-semibold">Recent Activity</h2>
-            <button className="text-sm font-semibold text-primary hover:underline">Full Audit Log</button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <h2 className="font-display text-2xl sm:text-3xl font-semibold">Recent Activity</h2>
+            <button className="text-sm font-semibold text-primary hover:underline self-start">Full Audit Log</button>
           </div>
           <ul className="divide-y divide-border">
             {activity.map((a, i) => {
               const Icon = a.icon;
               return (
                 <li key={i} className="py-4 flex items-start gap-4">
-                  <div className={`h-11 w-11 rounded-xl grid place-items-center ${a.tint}`}>
+                  <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-xl shrink-0 grid place-items-center ${a.tint}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="font-semibold text-foreground">{a.title}</div>
-                      <div className="label-eyebrow shrink-0">{a.time}</div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                      <div className="font-semibold text-foreground text-sm sm:text-base truncate">{a.title}</div>
+                      <div className="label-eyebrow shrink-0 text-[10px] sm:text-xs">{a.time}</div>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">{a.sub}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 sm:line-clamp-none">{a.sub}</div>
                   </div>
                 </li>
               );
             })}
           </ul>
 
-          {/* Live traffic floating card */}
-          <div className="absolute right-6 bottom-6 bg-card rounded-2xl shadow-deep border border-border p-4 w-60">
+          {/* Live traffic floating card - Hidden on mobile, shown on lg */}
+          <div className="hidden lg:block absolute right-6 bottom-6 bg-card rounded-2xl shadow-deep border border-border p-4 w-60">
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="h-4 w-4 text-primary" />
               <span className="label-eyebrow">Live Traffic</span>
