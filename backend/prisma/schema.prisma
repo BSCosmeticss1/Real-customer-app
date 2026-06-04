@@ -1,0 +1,290 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  INVENTORY_MANAGER
+  FINANCE_MANAGER
+  MESSAGING_MANAGER
+}
+
+model User {
+  id                String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  password          String
+  role              Role      @default(ADMIN)
+  createdBy         String?
+  creator           User?     @relation("UserToCreator", fields: [createdBy], references: [id])
+  subUsers          User[]    @relation("UserToCreator")
+  
+  avatar            String?
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  verificationOTP   String?
+  verificationExpires DateTime?
+  onboardingStatus  String    @default("PENDING") // PENDING, VERIFIED, ONBOARDING, COMPLETED
+  mustChangePassword Boolean  @default(false)
+  lastLogin         DateTime?
+  
+  resetPasswordOTP     String?
+  resetPasswordExpires DateTime?
+
+  // Using Json for settings and complex nested data as per the Mongoose schema
+  settings          Json?     // businessName, businessPhone, businessAddress, website, currency, timezone
+  apiKeys           Json?     // whatsappToken, whatsappPhoneId, facebookToken, facebookPageId, instagramToken, paystackKey
+  bankDetails       Json?     // bankName, accountName, accountNumber, sortCode
+  notificationPrefs Json?     // emailOnFail, emailOnSuccess, browserAlerts, dailySummary
+  subscription      Json?     // status, plan, expiresAt, paystackCustomerCode
+
+  contacts          Contact[]
+  invoices          Invoice[]
+  expenses          Expense[]
+  products          Product[]
+  stockMovements    StockMovement[]
+  messageLogs       MessageLog[]
+  scheduledMessages ScheduledMessage[]
+  templates         MessageTemplate[]
+  payments          Payment[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  company   String?
+  email     String?
+  phone     String?
+  whatsapp  String?
+  facebook  String?
+  instagram String?
+  tiktok    String?
+  reels     String?
+  tags      String[] @default([])
+  segment   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  source    String   @default("manual") // manual, import, api
+
+  messageLogs       MessageLog[]
+  scheduledMessages ScheduledMessage[] @relation("ContactToScheduledMessage")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, name])
+  @@index([userId, phone])
+  @@index([userId, whatsapp])
+  @@map("contacts")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  invoiceNumber String        @unique
+  client        String
+  clientEmail   String?
+  items         InvoiceItem[]
+  subtotal      Float         @default(0)
+  tax           Float         @default(0)
+  taxAmount     Float         @default(0)
+  total         Float         @default(0)
+  status        String        @default("pending") // pending, draft, sent, paid, overdue
+  dueDate       DateTime?
+  paidAt        DateTime?
+  notes         String?
+  
+  payments      Payment[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int
+  price       Float
+  total       Float
+
+  @@map("invoice_items")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  description String
+  amount      Float
+  category    String   @default("Operations")
+  date        DateTime @default(now())
+  receipt     String?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, date(sort: Desc)])
+  @@index([userId, category])
+  @@map("expenses")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  name          String
+  sku           String
+  category      String?
+  description   String?
+  quantity      Int      @default(0)
+  reorderLevel  Int      @default(10)
+  price         Float
+  costPrice     Float    @default(0)
+  warehouse     String   @default("Main Warehouse")
+  unit          String   @default("piece")
+  isActive      Boolean  @default(true)
+
+  stockMovements StockMovement[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, sku])
+  @@index([userId, category])
+  @@map("products")
+}
+
+model StockMovement {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id])
+  type             String // incoming, outgoing
+  quantity         Int
+  previousQuantity Int?
+  newQuantity      Int?
+  reference        String?
+  notes            String?
+  createdBy        String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId, productId])
+  @@index([userId, type])
+  @@index([createdAt(sort: Desc)])
+  @@map("stock_movements")
+}
+
+model MessageLog {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  contactId          String?
+  contact            Contact? @relation(fields: [contactId], references: [id])
+  contactName        String?
+  platform           String // whatsapp, instagram, facebook, sms
+  content            String
+  status             String   @default("pending") // sent, pending, failed
+  error              String?
+  externalId         String?
+  sentAt             DateTime @default(now())
+  scheduledMessageId String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, platform])
+  @@index([userId, sentAt(sort: Desc)])
+  @@map("message_logs")
+}
+
+model ScheduledMessage {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  templateId  String?
+  template    MessageTemplate? @relation(fields: [templateId], references: [id])
+  content     String
+  platform    String // whatsapp, instagram, facebook, sms
+  contacts    Contact[] @relation("ContactToScheduledMessage")
+  scheduledAt DateTime
+  recurrence  String    @default("none") // none, daily, weekly, monthly
+  status      String    @default("pending") // pending, sent, failed, cancelled
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  jobId       String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([scheduledAt, status])
+  @@map("scheduled_messages")
+}
+
+model MessageTemplate {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  content   String
+  platform  String   @default("all")
+  variables String[] @default([])
+  isActive  Boolean  @default(true)
+
+  scheduledMessages ScheduledMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("message_templates")
+}
+
+model Payment {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  reference    String   @unique
+  amount       Float
+  currency     String   @default("NGN")
+  method       String // paystack, bank_transfer, cash, other
+  status       String   @default("pending") // pending, success, failed, refunded
+  description  String?
+  metadata     Json?
+  paystackData Json?
+  invoiceId    String?
+  invoice      Invoice? @relation(fields: [invoiceId], references: [id])
+  paidAt       DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([reference])
+  @@map("payments")
+}
