@@ -3,19 +3,51 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, Mail, Lock, User } from "lucide-react";
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 
 export default function Signup() {
   const router = useRouter();
-  const onSubmit = (e: FormEvent) => {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    router.push("/app");
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          name: formData.email.split('@')[0], // Default name from email prefix
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // Store token for later (though we'll need it after verification)
+        localStorage.setItem("token", data.data.token);
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+      } else {
+        setError(data.message || "Signup failed");
+      }
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="h-screen grid lg:grid-cols-2 bg-background overflow-hidden">
       {/* Left — brand panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 text-primary-foreground relative overflow-hidden" style={{ background: "var(--gradient-deep)" }}>
+      <div className="hidden lg:flex flex-col justify-between p-12 text-primary-foreground relative overflow-hidden shrink-0" style={{ background: "var(--gradient-deep)" }}>
         <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
         <div>
           <div className="label-eyebrow text-primary-foreground/70">Multi-Tenant Engine</div>
@@ -31,23 +63,43 @@ export default function Signup() {
       </div>
 
       {/* Right — form */}
-      <div className="flex flex-col justify-center px-8 sm:px-16 py-12">
-        <div className="max-w-md w-full mx-auto">
-          <div className="lg:hidden mb-8">
+      <div className="flex flex-col px-8 sm:px-16 py-6 overflow-y-auto">
+        <div className="max-w-md w-full mx-auto my-auto py-8">
+          <div className="lg:hidden mb-6">
             <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
           </div>
           <div className="label-eyebrow">Create account</div>
-          <h1 className="font-display text-4xl font-semibold mt-3 text-foreground">Start your organization</h1>
-          <p className="text-muted-foreground mt-3">Already have one? <Link href="/login" className="text-primary font-semibold hover:underline">Sign in</Link></p>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2 text-foreground">Start your organization</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">Already have one? <Link href="/login" className="text-primary font-semibold hover:underline">Sign in</Link></p>
 
-          <form onSubmit={onSubmit} className="mt-10 space-y-5">
-            <Field icon={User} label="Your name" placeholder="Jane Doe" />
-            <Field icon={Building2} label="Organization name" placeholder="Acme Corp" />
-            <Field icon={Mail} label="Work email" placeholder="jane@acme.com" type="email" />
-            <Field icon={Lock} label="Password" placeholder="••••••••" type="password" />
+          <form onSubmit={onSubmit} className="mt-6 sm:mt-8 space-y-4">
+            <Field 
+              icon={Mail} 
+              label="Work email" 
+              placeholder="jane@acme.com" 
+              type="email" 
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+            <Field 
+              icon={Lock} 
+              label="Password" 
+              placeholder="••••••••" 
+              type="password" 
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
 
-            <button type="submit" className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition">
-              Create organization <ArrowRight className="h-4 w-4" />
+            {error && <p className="text-destructive text-sm">{error}</p>}
+
+            <button 
+              disabled={loading}
+              type="submit" 
+              className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition disabled:opacity-50"
+            >
+              {loading ? "Creating..." : "Create organization"} <ArrowRight className="h-4 w-4" />
             </button>
             <p className="text-xs text-muted-foreground text-center">By signing up you agree to our Terms & Privacy Policy.</p>
           </form>

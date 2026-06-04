@@ -3,13 +3,52 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Mail, Lock } from "lucide-react";
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
+import { toast } from "sonner";
 
 export default function Login() {
   const router = useRouter();
-  const onSubmit = (e: FormEvent) => {
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    router.push("/app");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem("token", data.data.token);
+        toast.success("Welcome back!");
+        
+        // Check onboarding status
+        const { onboardingStatus, isVerified, email } = data.data.user;
+        
+        if (!isVerified) {
+          router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+          return;
+        }
+
+        if (onboardingStatus !== "COMPLETED") {
+          router.push("/onboarding");
+          return;
+        }
+
+        router.push("/app");
+      } else {
+        toast.error(data.message || "Login failed");
+      }
+    } catch (err) {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -25,24 +64,48 @@ export default function Login() {
         <div aria-hidden className="absolute -right-24 -bottom-24 h-96 w-96 rounded-full border border-primary-foreground/10" />
       </div>
 
-      <div className="flex flex-col justify-center px-8 sm:px-16 py-12">
-        <div className="max-w-md w-full mx-auto">
-          <div className="lg:hidden mb-8">
+      {/* Right — form */}
+      <div className="flex flex-col px-8 sm:px-16 py-6 overflow-y-auto">
+        <div className="max-w-md w-full mx-auto my-auto py-8">
+          <div className="lg:hidden mb-6">
             <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
           </div>
           <div className="label-eyebrow">Sign in</div>
-          <h1 className="font-display text-4xl font-semibold mt-3 text-foreground">Welcome back</h1>
-          <p className="text-muted-foreground mt-3">New here? <Link href="/signup" className="text-primary font-semibold hover:underline">Create an organization</Link></p>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2 text-foreground">Welcome back</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">New here? <Link href="/signup" className="text-primary font-semibold hover:underline">Create an organization</Link></p>
 
-          <form onSubmit={onSubmit} className="mt-10 space-y-5">
-            <Field icon={Mail} label="Email" placeholder="jane@acme.com" type="email" />
-            <Field icon={Lock} label="Password" placeholder="••••••••" type="password" />
+          <form onSubmit={onSubmit} className="mt-6 sm:mt-8 space-y-4">
+            <Field 
+              icon={Mail} 
+              label="Email" 
+              placeholder="jane@acme.com" 
+              type="email" 
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+            <Field 
+              icon={Lock} 
+              label="Password" 
+              placeholder="••••••••" 
+              type="password" 
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-muted-foreground"><input type="checkbox" className="rounded border-border" /> Remember me</label>
-              <a className="text-primary font-semibold hover:underline cursor-pointer">Forgot password?</a>
+              <Link href="/forgot-password" data-ignore className="text-primary font-semibold hover:underline cursor-pointer">Forgot password?</Link>
             </div>
-            <button type="submit" className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition">
-              Sign in <ArrowRight className="h-4 w-4" />
+            
+            {/* Removed inline error display in favor of toast */}
+
+            <button 
+              disabled={loading}
+              type="submit" 
+              className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition disabled:opacity-50"
+            >
+              {loading ? "Signing in..." : "Sign in"} <ArrowRight className="h-4 w-4" />
             </button>
           </form>
         </div>
