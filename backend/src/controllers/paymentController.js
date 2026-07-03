@@ -59,12 +59,17 @@ exports.initializePaystack = async (req, res, next) => {
 // @route POST /payments/paystack/initialize-subscription
 exports.initializeSubscription = async (req, res, next) => {
   try {
-    const { planType } = req.body; // 'monthly' or 'yearly'
+    const { planType, selectedFeatures, amount } = req.body; // 'monthly' or 'yearly', selected features, and total amount
     if (!planType || !['monthly', 'yearly'].includes(planType)) {
       return res.status(400).json({ success: false, message: 'Valid planType (monthly or yearly) is required' });
     }
+    if (!selectedFeatures || !Array.isArray(selectedFeatures) || selectedFeatures.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one feature must be selected' });
+    }
+    if (!amount || typeof amount !== 'number') {
+      return res.status(400).json({ success: false, message: 'Valid amount is required' });
+    }
 
-    const amount = planType === 'monthly' ? 30000 : 120000;
     const email = req.user.email;
 
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
@@ -86,6 +91,7 @@ exports.initializeSubscription = async (req, res, next) => {
         metadata: { 
           userId: req.user.id, 
           planType, 
+          selectedFeatures,
           isSubscription: true 
         },
       },
@@ -100,8 +106,8 @@ exports.initializeSubscription = async (req, res, next) => {
         currency: 'NGN',
         method: 'paystack',
         status: 'pending',
-        description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} Subscription`,
-        metadata: { planType, isSubscription: true },
+        description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} Subscription - ${selectedFeatures.length} features`,
+        metadata: { planType, selectedFeatures, isSubscription: true },
       },
     });
 
@@ -162,6 +168,7 @@ exports.verifyPaystack = async (req, res, next) => {
             plan: txData.metadata.planType,
             expiresAt: expiresAt.toISOString(),
             paystackCustomerCode: txData.customer.customer_code,
+            selectedFeatures: txData.metadata.selectedFeatures || [],
           },
           onboardingStatus: 'COMPLETED',
         },

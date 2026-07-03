@@ -2,21 +2,23 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, MessageSquare, Sparkles, Users, LineChart, Settings, HelpCircle, Plus, Search, Bell, Grid3x3, UserCog, Package, ClipboardList, Menu, Lock } from "lucide-react";
+import { LayoutGrid, MessageSquare, Sparkles, Users, LineChart, Settings, HelpCircle, Plus, Search, Bell, Grid3x3, UserCog, Package, ClipboardList, Menu, Lock, CreditCard } from "lucide-react";
 import OrgSwitcher from "@/components/OrgSwitcher";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
+// Map nav items to feature IDs (and dashboard is always shown, team/subscription are always shown)
 const nav = [
-  { href: "/app", label: "Dashboard", icon: LayoutGrid, exact: true, roles: ["ADMIN", "FINANCE_MANAGER"] },
-  { href: "/app/messaging", label: "Messaging", icon: MessageSquare, roles: ["ADMIN", "MESSAGING_MANAGER"] },
-  { href: "/app/automation", label: "Automation", icon: Sparkles, roles: ["ADMIN", "MESSAGING_MANAGER"] },
-  { href: "/app/contacts", label: "Contacts", icon: Users, roles: ["ADMIN", "MESSAGING_MANAGER"] },
-  { href: "/app/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "INVENTORY_MANAGER"] },
-  { href: "/app/booking-reporting", label: "Booking Reporting", icon: ClipboardList, roles: ["ADMIN", "FINANCE_MANAGER"] },
-  { href: "/app/analytics", label: "Analytics", icon: LineChart, roles: ["ADMIN", "FINANCE_MANAGER"] },
-  { href: "/app/settings/team", label: "Team", icon: UserCog, roles: ["ADMIN"] },
+  { href: "/app", label: "Dashboard", icon: LayoutGrid, exact: true, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], alwaysShow: true },
+  { href: "/app/messaging", label: "Messaging", icon: MessageSquare, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
+  { href: "/app/automation", label: "Automation", icon: Sparkles, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "automation" },
+  { href: "/app/contacts", label: "Contacts", icon: Users, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "contacts" },
+  { href: "/app/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "inventory" },
+  { href: "/app/booking-reporting", label: "Booking Reporting", icon: ClipboardList, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "bookingReporting" },
+  { href: "/app/analytics", label: "Analytics", icon: LineChart, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "analytics" },
+  { href: "/app/settings/team", label: "Team", icon: UserCog, roles: ["ADMIN"], alwaysShow: true },
+  { href: "/app/settings/subscription", label: "Subscription", icon: CreditCard, roles: ["ADMIN"], alwaysShow: true },
 ];
 
 const titleMap: Record<string, string> = {
@@ -29,13 +31,41 @@ const titleMap: Record<string, string> = {
   "/app/analytics": "Search reports…",
   "/app/settings/team": "Search team members…",
   "/app/settings/organization": "Search settings…",
+  "/app/settings/subscription": "Manage subscription…",
 };
 
-function SidebarContent({ pathname, businessName, userRole }: { pathname: string; businessName?: string; userRole?: string }) {
+function SidebarContent({ pathname, businessName, userRole, selectedFeatures, allowedFeatures }: { pathname: string; businessName?: string; userRole?: string; selectedFeatures?: string[]; allowedFeatures?: string[] }) {
   const isActive = (href: string, exact: boolean) => {
     if (exact) return pathname === href;
     return pathname.startsWith(href);
   };
+
+  // For admin: use selectedFeatures from subscription
+  // For others: use allowedFeatures
+  const allFeatureIds = ["messaging", "contacts", "inventory", "analytics", "automation", "bookingReporting", "finance"];
+  let activeFeatures: string[];
+  
+  if (userRole === "ADMIN") {
+    activeFeatures = selectedFeatures && selectedFeatures.length > 0 ? selectedFeatures : allFeatureIds;
+  } else {
+    activeFeatures = allowedFeatures && allowedFeatures.length > 0 ? allowedFeatures : [];
+  }
+
+  // Filter nav items:
+  // - alwaysShow items
+  // - items where featureId is in activeFeatures
+  // - and role check
+  const filteredNav = nav.filter(item => {
+    // Role check
+    const hasRole = !userRole || item.roles.includes(userRole);
+    if (!hasRole) return false;
+
+    // Always show items
+    if (item.alwaysShow) return true;
+
+    // Feature check
+    return activeFeatures.includes(item.featureId);
+  });
 
   return (
     <div className="flex flex-col h-full bg-sidebar">
@@ -50,7 +80,7 @@ function SidebarContent({ pathname, businessName, userRole }: { pathname: string
       </div>
 
       <nav className="px-3 mt-2 space-y-1 flex-1">
-        {nav.filter(item => !userRole || item.roles.includes(userRole)).map(({ href, label, icon: Icon, exact }) => (
+        {filteredNav.map(({ href, label, icon: Icon, exact }) => (
           <Link
             key={href}
             href={href}
@@ -252,7 +282,13 @@ export default function AppLayout({
 
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 border-r border-sidebar-border flex-col">
-        <SidebarContent pathname={pathname} businessName={businessName} userRole={user?.role} />
+        <SidebarContent 
+          pathname={pathname} 
+          businessName={businessName} 
+          userRole={user?.role} 
+          selectedFeatures={user?.subscription?.selectedFeatures}
+          allowedFeatures={user?.allowedFeatures}
+        />
       </aside>
 
       {/* Main */}
@@ -267,7 +303,13 @@ export default function AppLayout({
                 </button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64">
-                <SidebarContent pathname={pathname} businessName={businessName} userRole={user?.role} />
+                <SidebarContent 
+                  pathname={pathname} 
+                  businessName={businessName} 
+                  userRole={user?.role} 
+                  selectedFeatures={user?.subscription?.selectedFeatures}
+                  allowedFeatures={user?.allowedFeatures}
+                />
               </SheetContent>
             </Sheet>
             

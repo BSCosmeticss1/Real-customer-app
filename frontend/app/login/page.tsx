@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Mail, Lock } from "lucide-react";
+import { ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ export default function Login() {
   const router = useRouter();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -84,11 +85,12 @@ export default function Login() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
             />
-            <Field 
+            <PasswordField 
               icon={Lock} 
               label="Password" 
               placeholder="••••••••" 
-              type="password" 
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
@@ -121,6 +123,29 @@ function Field({ icon: Icon, label, ...props }: { icon: any; label: string } & R
       <div className="relative mt-2">
         <Icon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input {...props} className="w-full bg-card border border-border rounded-xl pl-11 pr-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20" />
+      </div>
+    </label>
+  );
+}
+
+function PasswordField({ icon: Icon, label, showPassword, setShowPassword, ...props }: { icon: any; label: string; showPassword: boolean; setShowPassword: (show: boolean) => void } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <div className="relative mt-2">
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input 
+          {...props} 
+          type={showPassword ? "text" : "password"} 
+          className="w-full bg-card border border-border rounded-xl pl-11 pr-12 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20" 
+        />
+        <button 
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        >
+          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
       </div>
     </label>
   );

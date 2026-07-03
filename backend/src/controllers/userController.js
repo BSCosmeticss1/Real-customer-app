@@ -94,7 +94,7 @@ exports.getRoles = async (req, res) => {
 // ─── POST /users ─────────────────────────────────────────────────────────────
 exports.createUser = async (req, res, next) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, role, allowedFeatures } = req.body;
     const normalizedRole = role ? role.toUpperCase() : null;
 
     if (!name || !email || !normalizedRole) {
@@ -127,6 +127,7 @@ exports.createUser = async (req, res, next) => {
         mustChangePassword: true,
         onboardingStatus: 'COMPLETED', // Staff don't need onboarding
         isVerified: true, // Staff are verified by the admin
+        allowedFeatures: allowedFeatures || [],
       },
     });
 
@@ -277,7 +278,7 @@ exports.getUser = async (req, res, next) => {
 // ─── PUT /users/:id ───────────────────────────────────────────────────────────
 exports.updateUser = async (req, res, next) => {
   try {
-    const { name, email, role } = req.body;
+    const { name, email, role, allowedFeatures } = req.body;
     const normalizedRole = role ? role.toUpperCase() : null;
 
     const user = await prisma.user.findFirst({
@@ -293,6 +294,7 @@ exports.updateUser = async (req, res, next) => {
     if (name) data.name = name;
     if (email) data.email = email.toLowerCase();
     if (normalizedRole) data.role = normalizedRole;
+    if (allowedFeatures !== undefined) data.allowedFeatures = allowedFeatures;
 
     const updated = await prisma.user.update({
       where: { id: req.params.id },

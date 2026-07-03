@@ -14,30 +14,68 @@ const personalizeMessage = (content, contact) => {
 
 // Send WhatsApp message via Meta Business API
 const sendWhatsApp = async (to, message, userApiKeys) => {
+  console.log('[sendWhatsApp] Starting send...');
+  console.log('[sendWhatsApp] Input to:', to);
+  console.log('[sendWhatsApp] Input message:', message);
+  
   const token = userApiKeys?.whatsappToken || process.env.WHATSAPP_TOKEN;
   const phoneId = userApiKeys?.whatsappPhoneId || process.env.WHATSAPP_PHONE_ID;
 
-  if (!token || !phoneId) throw new Error('WhatsApp API not configured');
+  console.log('[sendWhatsApp] Using token (first 10 chars):', token?.substring(0, 10) || 'NOT FOUND');
+  console.log('[sendWhatsApp] Using phoneId:', phoneId || 'NOT FOUND');
 
-  // Normalize phone number
-  const phone = to.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
+  if (!token || !phoneId) {
+    console.error('[sendWhatsApp] ERROR: WhatsApp API not configured - missing token or phoneId');
+    throw new Error('WhatsApp API not configured');
+  }
 
-  const response = await axios.post(
-    `https://graph.facebook.com/v18.0/${phoneId}/messages`,
-    {
+  // Normalize phone number - requires international format
+  let phone = to.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
+  
+  // Handle Nigerian numbers (start with 08, 07, 09, convert to +234)
+  if (phone.startsWith('08') || phone.startsWith('07') || phone.startsWith('09')) {
+    phone = '234' + phone.substring(1);
+    console.log('[sendWhatsApp] Converted Nigerian number to:', phone);
+  }
+
+  console.log('[sendWhatsApp] Final normalized phone:', phone);
+
+  try {
+    const url = `https://graph.facebook.com/v22.0/${phoneId}/messages`;
+    console.log('[sendWhatsApp] Request URL:', url);
+    const requestBody = {
       messaging_product: 'whatsapp',
       to: phone,
       type: 'text',
       text: { body: message },
-    },
-    {
+    };
+    console.log('[sendWhatsApp] Request body:', JSON.stringify(requestBody, null, 2));
+
+    const response = await axios.post(url, requestBody, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+    });
+    console.log('[sendWhatsApp] Success! Response:', JSON.stringify(response.data, null, 2));
+    return response.data;
+  } catch (error) {
+    // Extract detailed error message from Meta
+    let errorMessage = error.message;
+    if (error.response && error.response.data) {
+      const metaError = error.response.data;
+      if (metaError.error) {
+        errorMessage = `${metaError.error.message} (Code: ${metaError.error.code}, Type: ${metaError.error.type})`;
+      } else {
+        errorMessage = JSON.stringify(metaError);
+      }
     }
-  );
-  return response.data;
+    console.error('[sendWhatsApp] ERROR:', errorMessage);
+    if (error.response) {
+      console.error('[sendWhatsApp] Response status:', error.response.status);
+    }
+    throw new Error(errorMessage);
+  }
 };
 
 // Send Facebook Messenger message
@@ -46,7 +84,7 @@ const sendFacebook = async (recipientId, message, userApiKeys) => {
   if (!token) throw new Error('Facebook API not configured');
 
   const response = await axios.post(
-    `https://graph.facebook.com/v18.0/me/messages`,
+    `https://graph.facebook.com/v22.0/me/messages`,
     {
       recipient: { id: recipientId },
       message: { text: message },
@@ -62,7 +100,7 @@ const sendInstagram = async (recipientId, message, userApiKeys) => {
   if (!token) throw new Error('Instagram API not configured');
 
   const response = await axios.post(
-    `https://graph.facebook.com/v18.0/me/messages`,
+    `https://graph.facebook.com/v22.0/me/messages`,
     {
       recipient: { id: recipientId },
       message: { text: message },

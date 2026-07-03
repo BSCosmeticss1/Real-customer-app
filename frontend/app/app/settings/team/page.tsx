@@ -1,8 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, MoreVertical, Plus, Shield, User, UserPlus, Loader2, Trash2, Key, Power } from "lucide-react";
+import { Plus, UserPlus, Loader2, Trash2, Key, Power, MessageSquare, Users, Package, BarChart3, Sparkles, Calendar, CreditCard, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+
+const FEATURE_MODULES = [
+  { id: "messaging", name: "Messaging", icon: MessageSquare },
+  { id: "contacts", name: "Contacts", icon: Users },
+  { id: "inventory", name: "Inventory", icon: Package },
+  { id: "analytics", name: "Analytics", icon: BarChart3 },
+  { id: "automation", name: "Automation", icon: Sparkles },
+  { id: "bookingReporting", name: "Booking & Reporting", icon: Calendar },
+  { id: "finance", name: "Finance", icon: CreditCard },
+];
 
 export default function Team() {
   const [members, setMembers] = useState<any[]>([]);
@@ -10,17 +24,23 @@ export default function Team() {
   const [inviting, setInviting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [inviteData, setInviteData] = useState({
     email: "",
-    role: "MESSAGING_MANAGER",
-    name: ""
+    role: "MESSAGING_MANAGER", // Use this as default staff role
+    name: "",
+    allowedFeatures: [] as string[]
   });
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState({
+    name: "",
+    role: "MESSAGING_MANAGER",
+    allowedFeatures: [] as string[]
+  });
+  const [updating, setUpdating] = useState(false);
 
-  const roles = [
-    { value: "MESSAGING_MANAGER", label: "Messaging Manager", desc: "Access to Messaging, Contacts and Templates" },
-    { value: "INVENTORY_MANAGER", label: "Inventory Manager", desc: "Access to Products and Stock Movements" },
-    { value: "FINANCE_MANAGER", label: "Finance Manager", desc: "Access to Invoices, Expenses and Cash Flow" },
-  ];
+  // We can keep roles for backward compatibility but focus on features
 
   const fetchMembers = async () => {
     try {
@@ -39,8 +59,27 @@ export default function Team() {
     }
   };
 
+  const fetchCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/me`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCurrentUser(data.data);
+        // Default allowedFeatures to all admin's paid features
+        const adminFeatures = data.data.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
+        setInviteData(prev => ({ ...prev, allowedFeatures: adminFeatures }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch current user", err);
+    }
+  };
+
   useEffect(() => {
     fetchMembers();
+    fetchCurrentUser();
   }, []);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -64,7 +103,9 @@ export default function Team() {
       const data = await res.json();
       if (data.success) {
         toast.success("Invite sent successfully!");
-        setInviteData({ email: "", role: "MESSAGING_MANAGER", name: "" });
+        // Reset with admin's paid features as default
+        const adminFeatures = currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
+        setInviteData({ email: "", role: "MESSAGING_MANAGER", name: "", allowedFeatures: adminFeatures });
         fetchMembers();
       } else {
         toast.error(data.message || "Failed to send invite");
@@ -119,13 +160,54 @@ export default function Team() {
     setShowDeleteModal(true);
   };
 
+  const startEdit = (member: any) => {
+    setEditingMember(member);
+    setEditData({
+      name: member.name,
+      role: member.role,
+      allowedFeatures: member.allowedFeatures || []
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    
+    setUpdating(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/users/${editingMember.id}`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` 
+        },
+        body: JSON.stringify(editData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Member updated successfully!");
+        setShowEditModal(false);
+        setEditingMember(null);
+        fetchMembers();
+      } else {
+        toast.error(data.message || "Failed to update member");
+      }
+    } catch (err) {
+      toast.error("Something went wrong");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-10 max-w-6xl">
       <div className="flex items-start justify-between">
         <div>
           <div className="label-eyebrow">Admin Console</div>
           <h1 className="font-display text-5xl font-semibold text-foreground mt-2">Team management</h1>
-          <p className="text-muted-foreground mt-3 text-lg">Invite your staff and assign specialized roles to manage your business operations.</p>
+          <p className="text-muted-foreground mt-3 text-lg">Invite your staff and assign access to specific features to manage your business operations.</p>
         </div>
       </div>
 
@@ -159,14 +241,53 @@ export default function Team() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Access Role</label>
-            <select 
-              value={inviteData.role}
-              onChange={e => setInviteData({...inviteData, role: e.target.value})}
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition appearance-none cursor-pointer"
-            >
-              {roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Allow Access to Features</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="secondary" className="w-full justify-between border border-border">
+                  {inviteData.allowedFeatures.length === 0 
+                    ? "Select features..." 
+                    : inviteData.allowedFeatures.length === 1 
+                      ? FEATURE_MODULES.find(f => f.id === inviteData.allowedFeatures[0])?.name 
+                      : `${inviteData.allowedFeatures.length} features selected`}
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-2">
+                <div className="space-y-2">
+                  {(() => {
+                    const adminFeatures = currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
+                    return FEATURE_MODULES.filter(feature => adminFeatures.includes(feature.id)).map(feature => {
+                      const Icon = feature.icon;
+                      const isSelected = inviteData.allowedFeatures.includes(feature.id);
+                      return (
+                        <div 
+                          key={feature.id}
+                          className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition"
+                        >
+                          <Checkbox 
+                            id={`invite-feature-${feature.id}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked: boolean | 'indeterminate') => {
+                              setInviteData(prev => ({
+                                ...prev,
+                                allowedFeatures: checked === true 
+                                  ? [...prev.allowedFeatures, feature.id]
+                                  : prev.allowedFeatures.filter(f => f !== feature.id)
+                              }));
+                            }}
+                          />
+                          <Label htmlFor={`invite-feature-${feature.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            {feature.name}
+                          </Label>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <button 
             disabled={inviting}
@@ -194,7 +315,7 @@ export default function Team() {
             <thead>
               <tr className="bg-muted/50 border-b border-border">
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Member</th>
-                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Specialized Role</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Allowed Features</th>
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</th>
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
               </tr>
@@ -227,13 +348,17 @@ export default function Team() {
                     </div>
                   </td>
                   <td className="px-6 py-5">
-                    <div className="flex flex-col">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
-                        {m.role.replace('_', ' ')}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {roles.find(r => r.value === m.role)?.desc || "Full access"}
-                      </span>
+                    <div className="flex flex-wrap gap-1">
+                      {(m.allowedFeatures || currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id)).map((featureId: string) => {
+                        const feature = FEATURE_MODULES.find(f => f.id === featureId);
+                        if (!feature) return null;
+                        return (
+                          <span key={featureId} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-secondary text-secondary-foreground">
+                            <feature.icon className="h-3 w-3" />
+                            {feature.name}
+                          </span>
+                        );
+                      })}
                     </div>
                   </td>
                   <td className="px-6 py-5">
@@ -246,6 +371,13 @@ export default function Team() {
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
+                      <button 
+                        onClick={() => startEdit(m)}
+                        title="Edit member"
+                        className="h-9 w-9 rounded-xl border border-border flex items-center justify-center hover:bg-secondary transition"
+                      >
+                        <Key className="h-4 w-4" />
+                      </button>
                       <button 
                         onClick={() => toggleStatus(m.id)}
                         title={m.isActive ? "Deactivate" : "Activate"}
@@ -300,6 +432,100 @@ export default function Team() {
                 Remove Member
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-6">
+          <div className="max-w-2xl w-full bg-card border border-border rounded-3xl shadow-deep p-8 animate-in zoom-in duration-300">
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-semibold">Edit Team Member</h2>
+              <p className="text-muted-foreground mt-1">Update member details and allowed features</p>
+            </div>
+
+            <form onSubmit={handleUpdateMember} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Name</label>
+                <input 
+                  value={editData.name}
+                  onChange={e => setEditData({...editData, name: e.target.value})}
+                  placeholder="Full name" 
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Allow Access to Features</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="secondary" className="w-full justify-between border border-border">
+                      {editData.allowedFeatures.length === 0 
+                        ? "Select features..." 
+                        : editData.allowedFeatures.length === 1 
+                          ? FEATURE_MODULES.find(f => f.id === editData.allowedFeatures[0])?.name 
+                          : `${editData.allowedFeatures.length} features selected`}
+                      <ChevronDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-2">
+                    <div className="space-y-2">
+                      {(() => {
+                        const adminFeatures = currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
+                        return FEATURE_MODULES.filter(feature => adminFeatures.includes(feature.id)).map(feature => {
+                          const Icon = feature.icon;
+                          const isSelected = editData.allowedFeatures.includes(feature.id);
+                          return (
+                            <div 
+                              key={feature.id}
+                              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition"
+                            >
+                              <Checkbox 
+                                id={`edit-feature-${feature.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked: boolean | 'indeterminate') => {
+                                  setEditData(prev => ({
+                                    ...prev,
+                                    allowedFeatures: checked === true 
+                                      ? [...prev.allowedFeatures, feature.id]
+                                      : prev.allowedFeatures.filter(f => f !== feature.id)
+                                  }));
+                                }}
+                              />
+                              <Label htmlFor={`edit-feature-${feature.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                {feature.name}
+                              </Label>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingMember(null);
+                  }}
+                  className="flex-1 px-6 py-3.5 rounded-xl border border-border font-semibold hover:bg-secondary transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="flex-1 bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold shadow-deep hover:bg-primary-glow transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

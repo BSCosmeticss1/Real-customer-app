@@ -8,24 +8,32 @@ const scheduledJobs = {};
 
 // @route POST /messages/send
 exports.sendNow = async (req, res, next) => {
+  console.log('[sendNow] Starting send...');
+  console.log('[sendNow] Request body:', req.body);
   try {
     const { platform, content, contacts: contactIds } = req.body;
     if (!platform || !content || !contactIds?.length) {
+      console.error('[sendNow] ERROR: Missing required fields');
       return res.status(400).json({ success: false, message: 'platform, content, and contacts are required' });
     }
 
+    console.log('[sendNow] Fetching user with id:', req.user.id);
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
     });
+    console.log('[sendNow] User found:', user?.id);
     
+    console.log('[sendNow] Fetching contacts with ids:', contactIds);
     const contacts = await prisma.contact.findMany({
       where: { id: { in: contactIds }, userId: req.user.id },
     });
+    console.log('[sendNow] Contacts found:', contacts.length);
 
     const results = { sent: 0, failed: 0 };
     const logs = [];
 
     for (const contact of contacts) {
+      console.log(`[sendNow] Processing contact: ${contact.name} (${contact.id})`);
       const logData = {
         userId: req.user.id,
         contactId: contact.id,
@@ -35,11 +43,14 @@ exports.sendNow = async (req, res, next) => {
         status: 'pending',
       };
       try {
+        console.log(`[sendNow] Calling sendMessage for ${contact.name}...`);
         const result = await sendMessage(platform, contact, content, user.apiKeys);
+        console.log(`[sendNow] Success for ${contact.name}!`);
         logData.status = 'sent';
         logData.externalId = result?.messages?.[0]?.id || result?.messageId;
         results.sent++;
       } catch (err) {
+        console.error(`[sendNow] Failed for ${contact.name}:`, err.message);
         logData.status = 'failed';
         logData.error = err.message;
         results.failed++;
@@ -47,12 +58,17 @@ exports.sendNow = async (req, res, next) => {
       logs.push(logData);
     }
 
+    console.log('[sendNow] Creating message logs...');
     await prisma.messageLog.createMany({
       data: logs,
     });
     
+    console.log('[sendNow] Done! Results:', results);
     res.json({ success: true, data: results, message: `Sent: ${results.sent}, Failed: ${results.failed}` });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[sendNow] Unhandled error:', err);
+    next(err);
+  }
 };
 
 // @route POST /messages/schedule
@@ -225,11 +241,16 @@ exports.cancelScheduled = async (req, res, next) => {
 // @route GET /messages/logs
 exports.getLogs = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status, platform } = req.query;
+    const { page = 1, limit = 20, status, platform, startDate, endDate } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const where = { userId: req.user.id };
     if (status) where.status = status;
     if (platform) where.platform = platform;
+    if (startDate || endDate) {
+      where.sentAt = {};
+      if (startDate) where.sentAt.gte = new Date(startDate as string);
+      if (endDate) where.sentAt.lte = new Date(endDate as string);
+    }
 
     const [logs, total] = await Promise.all([
       prisma.messageLog.findMany({

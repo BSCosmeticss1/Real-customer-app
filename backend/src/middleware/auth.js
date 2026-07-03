@@ -9,6 +9,13 @@ const ROLES = {
   MESSAGING_MANAGER: 'MESSAGING_MANAGER',
 };
 
+exports.ROLES = ROLES;
+
+// ─── Helper: Get owner user ID (admin if staff, self if admin) ─────────────────
+exports.getOwnerId = (user) => {
+  return user.createdBy || user.id;
+};
+
 // ─── Attach user from JWT ─────────────────────────────────────────────────────
 exports.protect = async (req, res, next) => {
   let token;

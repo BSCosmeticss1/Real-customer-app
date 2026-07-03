@@ -101,3 +101,14 @@ exports.getCashFlow = async (req, res, next) => {
     res.json({ success: true, data: cashFlow });
   } catch (err) { next(err); }
 };
+
+// @route GET /dashboard/scheduled
+exports.getScheduledCount = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const count = await prisma.scheduledMessage.count({
+      where: { userId, status: 'pending' },
+    });
+    res.json({ success: true, data: { count } });
+  } catch (err) { next(err); }
+};

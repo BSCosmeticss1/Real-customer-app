@@ -1,26 +1,114 @@
 "use client";
 
-import { Send, Hourglass, Calendar, AlertTriangle, TrendingUp, Clock, Check, Sparkles, CloudUpload, AlertCircle, UserPlus, BarChart3, MessageSquarePlus, Upload } from "lucide-react";
+import { Send, Hourglass, Calendar, AlertTriangle, TrendingUp, Clock, Check, Sparkles, AlertCircle, BarChart3, MessageSquarePlus, Upload } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 
-const stats = [
-  { label: "Total Sent", value: "1.2M", icon: Send, foot: <><TrendingUp className="h-3.5 w-3.5" /> +12.5% this month</>, tone: "default" },
-  { label: "Pending", value: "4,892", icon: Hourglass, foot: <><Clock className="h-3.5 w-3.5" /> Next batch in 4m</>, tone: "default" },
-  { label: "Scheduled", value: "124", icon: Calendar, foot: <><Calendar className="h-3.5 w-3.5" /> Active automations</>, tone: "default" },
-  { label: "Failure Rate", value: "0.04%", icon: AlertTriangle, foot: <><Check className="h-3.5 w-3.5" /> Within safe threshold</>, tone: "danger" },
-];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-const activity = [
-  { icon: Check, tint: "bg-success-soft text-success", title: 'Campaign "Spring Outreach" Completed', sub: "45,021 messages delivered successfully to Segment A.", time: "JUST NOW" },
-  { icon: Sparkles, tint: "bg-accent/40 text-primary", title: "New Automation Triggered", sub: "User signup workflow initiated for 12 new contacts.", time: "12M AGO" },
-  { icon: CloudUpload, tint: "bg-secondary text-primary", title: "Bulk Import Successful", sub: "Imported 12,500 contacts via Excel sheet.", time: "45M AGO" },
-  { icon: AlertCircle, tint: "bg-destructive-soft text-destructive", title: "API Rate Limit Warning", sub: 'Provider node "Delta" reaching throughput.', time: "1H AGO" },
-  { icon: UserPlus, tint: "bg-secondary text-primary", title: "New Administrator Added", sub: "Account access granted to Sarah Miller (Lead Dev).", time: "3H AGO" },
+function formatCount(n: number) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+  return String(n);
+}
+
+function relativeTime(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "JUST NOW";
+  if (mins < 60) return `${mins}M AGO`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}H AGO`;
+  return `${Math.floor(hours / 24)}D AGO`;
+}
+
+function activityTint(status: string) {
+  switch (status) {
+    case "sent": return "bg-success-soft text-success";
+    case "pending": return "bg-accent/40 text-primary";
+    case "failed": return "bg-destructive-soft text-destructive";
+    case "scheduled": return "bg-secondary text-primary";
+    default: return "bg-secondary text-primary";
+  }
+}
+
+const nodeStats = [
+  { name: "Messaging Gateway", value: "99.9%", dot: "bg-success" },
+  { name: "Automation Logic", value: "ONLINE", dot: "bg-success" },
+  { name: "API Endpoint v2", value: "ACTIVE", dot: "bg-primary-glow" },
 ];
 
 export default function Dashboard() {
+  const [token, setToken] = useState<string>("");
+
+  useEffect(() => {
+    setToken(localStorage.getItem("token") || "");
+  }, []);
+
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ["dashboard-stats"],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/dashboard/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      return data.data;
+    },
+  });
+
+  const { data: scheduledData } = useQuery({
+    queryKey: ["dashboard-scheduled"],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/dashboard/scheduled`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      return data.data;
+    },
+  });
+
+  const { data: activityData, isLoading: activityLoading } = useQuery({
+    queryKey: ["dashboard-activity"],
+    enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/dashboard/activity`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      return data.data;
+    },
+  });
+
+  const messagesSent = Number(statsData?.messagesSent || 0);
+  const pendingMessages = Number(statsData?.pendingMessages || 0);
+  const failedMessages = Number(statsData?.failedMessages || 0);
+  const totalDispatches = messagesSent + pendingMessages + failedMessages;
+  const failureRate = totalDispatches > 0 ? ((failedMessages / totalDispatches) * 100).toFixed(2) + "%" : "0.00%";
+
+  const stats = [
+    { label: "Total Sent", value: formatCount(messagesSent), icon: Send, foot: <><TrendingUp className="h-3.5 w-3.5" /> Live from backend</>, tone: "default" },
+    { label: "Pending", value: pendingMessages.toLocaleString(), icon: Hourglass, foot: <><Clock className="h-3.5 w-3.5" /> Queued messages</>, tone: "default" },
+    { label: "Scheduled", value: String(scheduledData?.count || 0), icon: Calendar, foot: <><Calendar className="h-3.5 w-3.5" /> Active automations</>, tone: "default" },
+    { label: "Failure Rate", value: failureRate, icon: AlertTriangle, foot: <><Check className="h-3.5 w-3.5" /> Monitored live</>, tone: parseFloat(failureRate) > 5 ? "danger" : "default" },
+  ];
+
+  const activity = (activityData || []).map((log: any) => {
+    const tint = activityTint(log.status);
+    const title = log.platform ? `${log.platform.charAt(0).toUpperCase() + log.platform.slice(1)} ${log.status === "sent" ? "Delivery" : log.status}` : "System Event";
+    const sub = log.content && String(log.content).trim() ? String(log.content).slice(0, 120) + (String(log.content).length > 120 ? "…" : "") : "No details";
+    const time = log.sentAt ? relativeTime(log.sentAt) : "RECENT";
+    return { tint, title, sub, time };
+  });
+
+  const isLoading = statsLoading || activityLoading;
+
   return (
     <div className="space-y-8">
-      {/* Title row */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="label-eyebrow text-primary">System Overview</div>
@@ -37,7 +125,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {stats.map((s) => {
           const Icon = s.icon;
@@ -48,16 +135,16 @@ export default function Dashboard() {
                 <div className={`label-eyebrow ${danger ? "text-destructive" : ""}`}>{s.label}</div>
                 <Icon className={`h-7 w-7 ${danger ? "text-destructive/40" : "text-muted-foreground/40"}`} />
               </div>
-              <div className={`font-display text-4xl sm:text-5xl font-semibold mt-6 ${danger ? "text-destructive" : "text-foreground"}`}>{s.value}</div>
+              <div className={`font-display text-4xl sm:text-5xl font-semibold mt-6 ${danger ? "text-destructive" : "text-foreground"}`}>
+                {isLoading ? <span className="inline-block h-10 w-20 bg-secondary/60 rounded animate-pulse" /> : s.value}
+              </div>
               <div className={`mt-6 text-xs flex items-center gap-1.5 ${danger ? "text-destructive" : "text-muted-foreground"}`}>{s.foot}</div>
             </div>
           );
         })}
       </div>
 
-      {/* Quick start + activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left col */}
         <div className="space-y-6">
           <div className="rounded-2xl bg-gradient-deep text-primary-foreground p-7 shadow-deep">
             <h2 className="font-display text-2xl sm:text-3xl font-semibold">Quick Start</h2>
@@ -78,11 +165,7 @@ export default function Dashboard() {
               <h3 className="font-display text-xl font-semibold">System Nodes</h3>
             </div>
             <ul className="space-y-4 text-sm">
-              {[
-                { name: "Messaging Gateway", value: "99.9%", dot: "bg-success" },
-                { name: "Automation Logic", value: "ONLINE", dot: "bg-success" },
-                { name: "API Endpoint v2", value: "ACTIVE", dot: "bg-primary-glow" },
-              ].map((n) => (
+              {nodeStats.map((n) => (
                 <li key={n.name} className="flex items-center justify-between">
                   <span className="flex items-center gap-3 font-medium text-foreground">
                     <span className={`h-2.5 w-2.5 rounded-full ${n.dot}`} />
@@ -95,33 +178,36 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right col activity */}
         <div className="lg:col-span-2 rounded-2xl bg-card p-7 shadow-card relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <h2 className="font-display text-2xl sm:text-3xl font-semibold">Recent Activity</h2>
             <button className="text-sm font-semibold text-primary hover:underline self-start">Full Audit Log</button>
           </div>
-          <ul className="divide-y divide-border">
-            {activity.map((a, i) => {
-              const Icon = a.icon;
-              return (
-                <li key={i} className="py-4 flex items-start gap-4">
-                  <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-xl shrink-0 grid place-items-center ${a.tint}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                      <div className="font-semibold text-foreground text-sm sm:text-base truncate">{a.title}</div>
-                      <div className="label-eyebrow shrink-0 text-[10px] sm:text-xs">{a.time}</div>
+          {isLoading || activity.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              {isLoading ? "Loading activity..." : "No activity yet."}
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {activity.map((a, i) => {
+                return (
+                  <li key={i} className="py-4 flex items-start gap-4">
+                    <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-xl shrink-0 grid place-items-center ${a.tint}`}>
+                      {iconFromTint(a.tint)}
                     </div>
-                    <div className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 sm:line-clamp-none">{a.sub}</div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                        <div className="font-semibold text-foreground text-sm sm:text-base truncate">{a.title}</div>
+                        <div className="label-eyebrow shrink-0 text-[10px] sm:text-xs">{a.time}</div>
+                      </div>
+                      <div className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 sm:line-clamp-none">{a.sub}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-          {/* Live traffic floating card - Hidden on mobile, shown on lg */}
           <div className="hidden lg:block absolute right-6 bottom-6 bg-card rounded-2xl shadow-deep border border-border p-4 w-60">
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 className="h-4 w-4 text-primary" />
@@ -138,4 +224,11 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function iconFromTint(tint: string) {
+  if (tint.includes("success")) return <Check className="h-5 w-5" />;
+  if (tint.includes("destructive")) return <AlertCircle className="h-5 w-5" />;
+  if (tint.includes("accent")) return <Clock className="h-5 w-5" />;
+  return <Sparkles className="h-5 w-5" />;
 }
