@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, MessageSquare, Sparkles, Users, LineChart, Settings, HelpCircle, Plus, Search, Bell, Grid3x3, UserCog, Package, ClipboardList, Menu, Lock, CreditCard } from "lucide-react";
+import { LayoutGrid, MessageSquare, Sparkles, Users, LineChart, Settings, HelpCircle, Plus, Search, Bell, Grid3x3, UserCog, Package, ClipboardList, Menu, Lock, CreditCard, Phone, Mail } from "lucide-react";
 import OrgSwitcher from "@/components/OrgSwitcher";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -12,6 +12,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const nav = [
   { href: "/app", label: "Dashboard", icon: LayoutGrid, exact: true, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], alwaysShow: true },
   { href: "/app/messaging", label: "Messaging", icon: MessageSquare, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
+  { href: "/app/sms", label: "SMS", icon: Phone, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
+  { href: "/app/email", label: "Email", icon: Mail, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
   { href: "/app/automation", label: "Automation", icon: Sparkles, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "automation" },
   { href: "/app/contacts", label: "Contacts", icon: Users, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "contacts" },
   { href: "/app/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "inventory" },
@@ -24,6 +26,8 @@ const nav = [
 const titleMap: Record<string, string> = {
   "/app": "Search systems or logs…",
   "/app/messaging": "Search interactions…",
+  "/app/sms": "Search SMS recipients…",
+  "/app/email": "Search email recipients…",
   "/app/automation": "Search automation nodes…",
   "/app/contacts": "Search contacts or platforms…",
   "/app/inventory": "Search inventory items…",

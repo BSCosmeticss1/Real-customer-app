@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 const templates = [
   { tag: "WhatsApp", title: "Summer Sale Launch", preview: "Hi {{FirstName}}," },
   { tag: "Facebook", title: "Meeting Reminder", preview: "Hello {{FirstName}}," },
@@ -22,7 +24,7 @@ export default function Messaging() {
     queryKey: ["contacts"],
     queryFn: async () => {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/contacts?limit=100`, {
+      const res = await fetch(`${API_URL}/contacts?limit=100`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -34,7 +36,7 @@ export default function Messaging() {
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/messages/send`, {
+      const res = await fetch(`${API_URL}/messages/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,7 +63,7 @@ export default function Messaging() {
   });
 
   const toggleContact = (id: string) => {
-    setSelectedContacts(prev => 
+    setSelectedContacts(prev =>
       prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]
     );
   };
@@ -85,8 +87,8 @@ export default function Messaging() {
 
   const hasPlatform = (contact: any, platform: string) => {
     const p = platform.toLowerCase();
-    return (p === "whatsapp" && contact.whatsapp) || 
-           (p === "facebook" && contact.facebook) || 
+    return (p === "whatsapp" && contact.whatsapp) ||
+           (p === "facebook" && contact.facebook) ||
            (p === "instagram" && contact.instagram);
   };
 
@@ -103,8 +105,8 @@ export default function Messaging() {
         </div>
         <div className="space-y-4">
           {templates.map((t) => (
-            <div 
-              key={t.title} 
+            <div
+              key={t.title}
               className="border-l-2 border-primary pl-4 cursor-pointer hover:pl-5 transition-all"
               onClick={() => setMessageContent(t.preview + "\n\nWrite your message here...")}
             >
@@ -129,8 +131,8 @@ export default function Messaging() {
               { name: "Messenger", icon: MessageCircle, active: false },
               { name: "Instagram", icon: Camera, active: false },
             ].map(({ name, icon: Icon, active }) => (
-              <button 
-                key={name} 
+              <button
+                key={name}
                 className={`rounded-xl py-6 flex flex-col items-center gap-2 transition ${active ? "bg-primary text-primary-foreground shadow-deep" : "bg-secondary text-muted-foreground hover:bg-secondary/70"}`}
               >
                 <Icon className="h-6 w-6" />
@@ -143,7 +145,7 @@ export default function Messaging() {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-3">
             <div className="label-eyebrow">Selected Contacts ({selectedContacts.length})</div>
-            <button 
+            <button
               onClick={() => setShowContactSelector(true)}
               className="text-primary text-sm font-semibold hover:underline"
             >
@@ -155,7 +157,7 @@ export default function Messaging() {
               {selectedContactsDetails.map((c: any) => (
                 <div key={c.id} className="flex items-center gap-2 bg-secondary px-3 py-2 rounded-xl text-sm">
                   <span>{c.name}</span>
-                  <button 
+                  <button
                     onClick={() => toggleContact(c.id)}
                     className="text-muted-foreground hover:text-destructive"
                   >
@@ -192,8 +194,8 @@ export default function Messaging() {
           <div className="label-eyebrow mb-3">Personalization Tags</div>
           <div className="flex flex-wrap gap-2">
             {["+ FirstName","+ FullName","+ Company","+ Phone","+ Email","+ Date"].map(tag => (
-              <button 
-                key={tag} 
+              <button
+                key={tag}
                 onClick={() => {
                   const actualTag = tag.replace("+ ", "").replace(" ", "");
                   setMessageContent(prev => prev + ` {{${actualTag}}}`);
@@ -207,7 +209,7 @@ export default function Messaging() {
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-3">
-          <button 
+          <button
             onClick={() => sendMessageMutation.mutate()}
             disabled={sendMessageMutation.isPending || selectedContacts.length === 0}
             className="bg-primary text-primary-foreground rounded-xl py-4 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition disabled:opacity-50"
@@ -265,8 +267,8 @@ export default function Messaging() {
             </div>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   className="accent-primary h-4 w-4"
                   checked={contacts.length > 0 && selectedContacts.length === contacts.length}
                   onChange={toggleAllContacts}
@@ -289,13 +291,13 @@ export default function Messaging() {
               ) : (
                 <div className="divide-y divide-border">
                   {contacts.map((c: any) => (
-                    <label 
-                      key={c.id} 
+                    <label
+                      key={c.id}
                       className={`flex items-center gap-4 p-4 hover:bg-secondary/30 cursor-pointer transition ${selectedContacts.includes(c.id) ? "bg-secondary/50" : ""}`}
                     >
                       <div className="flex-shrink-0">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="accent-primary h-5 w-5"
                           checked={selectedContacts.includes(c.id)}
                           onChange={() => toggleContact(c.id)}
@@ -312,7 +314,7 @@ export default function Messaging() {
                       </div>
                       <div className="flex gap-2">
                         {["WhatsApp", "Facebook", "Instagram"].map((platform) => (
-                          <div 
+                          <div
                             key={platform}
                             className={`h-8 w-8 rounded-lg grid place-items-center ${hasPlatform(c, platform) ? "bg-success/10 text-success" : "bg-secondary/50 text-muted-foreground"}`}
                           >
@@ -326,14 +328,14 @@ export default function Messaging() {
               )}
             </div>
             <div className="p-6 border-t border-border flex gap-3 justify-end sticky bottom-0 bg-card">
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowContactSelector(false)}
                 className="px-6 py-3 rounded-xl border border-border text-sm font-semibold hover:bg-secondary transition"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowContactSelector(false)}
                 className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-deep hover:bg-primary-glow transition"

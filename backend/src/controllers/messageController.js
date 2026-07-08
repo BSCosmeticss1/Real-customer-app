@@ -1,5 +1,6 @@
 const { prisma } = require('../config/db');
 const { sendMessage } = require('../services/messagingService');
+const { sendEmail } = require('../services/emailService');
 const { paginateResult } = require('../middleware/paginate');
 const schedule = require('node-schedule');
 
@@ -238,6 +239,228 @@ exports.cancelScheduled = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// @route POST /messages/sms/send
+exports.sendSMS = async (req, res, next) => {
+  try {
+    const { content, contacts: contactIds, phoneNumbers } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ success: false, message: 'content is required' });
+    }
+
+    const parsedContactIds = Array.isArray(contactIds) ? contactIds : [];
+    const parsedNumbers = Array.isArray(phoneNumbers) ? phoneNumbers : [];
+
+    if (parsedContactIds.length === 0 && parsedNumbers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide at least one contact or phone number',
+      });
+    }
+
+    // Resolve contacts owned by the user
+    const contacts = parsedContactIds.length
+      ? await prisma.contact.findMany({
+          where: { id: { in: parsedContactIds }, userId: req.user.id },
+        })
+      : [];
+
+    const seen = new Set();
+    const recipients = [];
+
+    for (const c of contacts) {
+      const phone = c.phone || c.whatsapp;
+      if (!phone) continue;
+      const normalized = String(phone).replace(/[\s\-\(\)\.]/g, '').replace(/^\+/, '');
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      recipients.push({ phone, contactId: c.id, contactName: c.name });
+    }
+
+    for (const raw of parsedNumbers) {
+      const phone = String(raw).trim();
+      if (!phone) continue;
+      const normalized = phone.replace(/[\s\-\(\)\.]/g, '').replace(/^\+/, '');
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      recipients.push({ phone, contactId: null, contactName: phone });
+    }
+
+    if (recipients.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid phone numbers found' });
+    }
+
+    const results = { sent: 0, failed: 0 };
+    const logs = [];
+
+    for (const recipient of recipients) {
+      const logData = {
+        userId: req.user.id,
+        contactId: recipient.contactId,
+        contactName: recipient.contactName,
+        platform: 'sms',
+        content,
+        status: 'pending',
+      };
+      try {
+        const result = await sendMessage('sms', { phone: recipient.phone }, content, null);
+        logData.status = 'sent';
+        logData.externalId = result?.messageId;
+        results.sent++;
+      } catch (err) {
+        logData.status = 'failed';
+        logData.error = err.message;
+        results.failed++;
+      }
+      logs.push(logData);
+    }
+
+    await prisma.messageLog.createMany({ data: logs });
+
+    res.json({
+      success: true,
+      data: results,
+      message: `SMS Sent: ${results.sent}, Failed: ${results.failed}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @route POST /messages/email/send
+exports.sendEmail = async (req, res, next) => {
+  try {
+    const { subject, content, contacts: contactIds, emails } = req.body;
+
+    if (!subject || !content) {
+      return res.status(400).json({ success: false, message: 'subject and content are required' });
+    }
+
+    const parsedContactIds = Array.isArray(contactIds) ? contactIds : [];
+    const parsedEmails = Array.isArray(emails) ? emails : [];
+
+    if (parsedContactIds.length === 0 && parsedEmails.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Provide at least one contact or email address',
+      });
+    }
+
+    const contacts = parsedContactIds.length
+      ? await prisma.contact.findMany({
+          where: { id: { in: parsedContactIds }, userId: req.user.id },
+        })
+      : [];
+
+    const seen = new Set();
+    const recipients = [];
+
+    for (const c of contacts) {
+      if (!c.email) continue;
+      const normalized = String(c.email).trim().toLowerCase();
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      recipients.push({ email: c.email, contactId: c.id, contactName: c.name });
+    }
+
+    for (const raw of parsedEmails) {
+      const email = String(raw).trim();
+      if (!email) continue;
+      const normalized = email.toLowerCase();
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      recipients.push({ email, contactId: null, contactName: email });
+    }
+
+    if (recipients.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid email addresses found' });
+    }
+
+    const html = content
+      .split(/\n{2,}/)
+      .map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`)
+      .join('');
+
+    const results = { sent: 0, failed: 0 };
+    const logs = [];
+
+    for (const recipient of recipients) {
+      const logData = {
+        userId: req.user.id,
+        contactId: recipient.contactId,
+        contactName: recipient.contactName,
+        platform: 'email',
+        content,
+        status: 'pending',
+      };
+      try {
+        await sendEmail(recipient.email, subject, html);
+        logData.status = 'sent';
+        results.sent++;
+      } catch (err) {
+        logData.status = 'failed';
+        logData.error = err.message;
+        results.failed++;
+      }
+      logs.push(logData);
+    }
+
+    await prisma.messageLog.createMany({ data: logs });
+
+    res.json({
+      success: true,
+      data: results,
+      message: `Email Sent: ${results.sent}, Failed: ${results.failed}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @route GET /messages/email/logs
+exports.getEmailLogs = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const where = { userId: req.user.id, platform: 'email' };
+    if (status) where.status = status;
+
+    const [logs, total] = await Promise.all([
+      prisma.messageLog.findMany({
+        where,
+        orderBy: { sentAt: 'desc' },
+        skip,
+        take: Number(limit),
+        include: { contact: { select: { name: true } } },
+      }),
+      prisma.messageLog.count({ where }),
+    ]);
+    res.json({ success: true, ...paginateResult(logs, total, Number(page), Number(limit)) });
+  } catch (err) { next(err); }
+};
+
+// @route GET /messages/sms/logs
+exports.getSMSLogs = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const where = { userId: req.user.id, platform: 'sms' };
+    if (status) where.status = status;
+
+    const [logs, total] = await Promise.all([
+      prisma.messageLog.findMany({
+        where,
+        orderBy: { sentAt: 'desc' },
+        skip,
+        take: Number(limit),
+        include: { contact: { select: { name: true } } },
+      }),
+      prisma.messageLog.count({ where }),
+    ]);
+    res.json({ success: true, ...paginateResult(logs, total, Number(page), Number(limit)) });
+  } catch (err) { next(err); }
+};
+
 // @route GET /messages/logs
 exports.getLogs = async (req, res, next) => {
   try {
@@ -248,8 +471,8 @@ exports.getLogs = async (req, res, next) => {
     if (platform) where.platform = platform;
     if (startDate || endDate) {
       where.sentAt = {};
-      if (startDate) where.sentAt.gte = new Date(startDate as string);
-      if (endDate) where.sentAt.lte = new Date(endDate as string);
+      if (startDate) where.sentAt.gte = new Date(startDate);
+      if (endDate) where.sentAt.lte = new Date(endDate);
     }
 
     const [logs, total] = await Promise.all([

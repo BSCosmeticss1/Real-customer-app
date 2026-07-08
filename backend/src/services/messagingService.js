@@ -110,13 +110,60 @@ const sendInstagram = async (recipientId, message, userApiKeys) => {
   return response.data;
 };
 
-// Send SMS (placeholder – integrate with your SMS provider e.g. Termii, Twilio)
+// Normalize a phone number into international format (digits only, no +)
+const normalizePhone = (raw) => {
+  let phone = String(raw).replace(/[\s\-\(\)\.]/g, '').replace(/^\+/, '');
+  // Remove leading 0 and add Nigeria country code
+  if (phone.startsWith('0')) {
+    phone = '234' + phone.substring(1);
+  }
+  // If it starts with a local digit without country code (e.g. 70/80/90)
+  if (!phone.startsWith('234') && (phone.startsWith('7') || phone.startsWith('8') || phone.startsWith('9'))) {
+    phone = '234' + phone;
+  }
+  return phone;
+};
+
+// Send SMS via Termii API
 const sendSMS = async (phone, message) => {
-  // Example: Termii SMS API
-  // const response = await axios.post('https://api.ng.termii.com/api/sms/send', { to: phone, from: 'YourBrand', sms: message, type: 'plain', channel: 'generic', api_key: process.env.TERMII_API_KEY });
-  // Placeholder: simulate success
-  console.log(`[SMS] To: ${phone} | Message: ${message}`);
-  return { messageId: `sms_${Date.now()}` };
+  const apiKey = process.env.TERMII_API_KEY;
+  const senderId = process.env.TERMII_SENDER_ID;
+  const baseUrl = process.env.TERMII_BASE_URL || 'https://v3.api.termii.com';
+
+  if (!apiKey) throw new Error('Termii API not configured');
+
+  const to = normalizePhone(phone);
+
+  try {
+    const response = await axios.post(
+      `${baseUrl}/api/sms/send`,
+      {
+        to,
+        from: senderId,
+        sms: message,
+        type: 'plain',
+        channel: 'generic',
+        api_key: apiKey,
+      },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    // Termii error responses come with code !== 'ok'
+    if (response.data && response.data.code && response.data.code !== 'ok') {
+      throw new Error(response.data.message || 'Termii SMS failed');
+    }
+
+    return {
+      messageId: response.data?.message_id || response.data?.messageId || `sms_${Date.now()}`,
+      raw: response.data,
+    };
+  } catch (error) {
+    let errorMessage = error.message;
+    if (error.response && error.response.data) {
+      errorMessage = error.response.data.message || JSON.stringify(error.response.data);
+    }
+    throw new Error(errorMessage);
+  }
 };
 
 // Main dispatch function
