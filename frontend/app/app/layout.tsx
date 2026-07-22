@@ -2,23 +2,52 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutGrid, MessageSquare, Sparkles, Users, LineChart, Settings, HelpCircle, Plus, Search, Bell, Grid3x3, UserCog, Package, ClipboardList, Menu, Lock, CreditCard, Phone, Mail } from "lucide-react";
+import { LayoutGrid, MessageSquare, Sparkles, Users, LineChart, Settings, HelpCircle, Plus, Search, Bell, Grid3x3, UserCog, Package, ClipboardList, Menu, Lock, CreditCard, Phone, Mail, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 import OrgSwitcher from "@/components/OrgSwitcher";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-// Map nav items to feature IDs (and dashboard is always shown, team/subscription are always shown)
+// Map nav items to sub-module IDs for granular access control
+const NAV_SUB_MODULES = [
+  "messaging", "sms", "email", "automation",
+  "contacts",
+  "inventory",
+  "book-keeping", "sales-reporting", "analytics"
+];
+
 const nav = [
   { href: "/app", label: "Dashboard", icon: LayoutGrid, exact: true, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], alwaysShow: true },
-  { href: "/app/messaging", label: "Messaging", icon: MessageSquare, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
-  { href: "/app/sms", label: "SMS", icon: Phone, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
-  { href: "/app/email", label: "Email", icon: Mail, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "messaging" },
-  { href: "/app/automation", label: "Automation", icon: Sparkles, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "automation" },
-  { href: "/app/contacts", label: "Contacts", icon: Users, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "contacts" },
-  { href: "/app/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "inventory" },
-  { href: "/app/booking-reporting", label: "Booking Reporting", icon: ClipboardList, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "bookingReporting" },
-  { href: "/app/analytics", label: "Analytics", icon: LineChart, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], featureId: "analytics" },
+  {
+    label: "Communication",
+    icon: MessageSquare,
+    roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"],
+    children: [
+      { href: "/app/messaging", label: "Messaging", moduleId: "messaging" },
+      { href: "/app/sms", label: "SMS", moduleId: "sms" },
+      { href: "/app/email", label: "Email", moduleId: "email" },
+      { href: "/app/automation", label: "Automation", moduleId: "automation" },
+    ]
+  },
+  {
+    label: "Contacts",
+    icon: Users,
+    roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"],
+    children: [
+      { href: "/app/contacts", label: "All Contacts", moduleId: "contacts" },
+    ]
+  },
+  {
+    label: "Reports",
+    icon: LineChart,
+    roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"],
+    children: [
+      { href: "/app/booking-reporting", label: "Book Keeping", moduleId: "book-keeping" },
+      { href: "/app/sales-reporting", label: "Sales Reporting", moduleId: "sales-reporting" },
+      { href: "/app/analytics", label: "Analytics", moduleId: "analytics" },
+    ]
+  },
+  { href: "/app/inventory", label: "Inventory", icon: Package, roles: ["ADMIN", "MESSAGING_MANAGER", "INVENTORY_MANAGER", "FINANCE_MANAGER"], moduleId: "inventory" },
   { href: "/app/settings/team", label: "Team", icon: UserCog, roles: ["ADMIN"], alwaysShow: true },
   { href: "/app/settings/subscription", label: "Subscription", icon: CreditCard, roles: ["ADMIN"], alwaysShow: true },
 ];
@@ -31,7 +60,8 @@ const titleMap: Record<string, string> = {
   "/app/automation": "Search automation nodes…",
   "/app/contacts": "Search contacts or platforms…",
   "/app/inventory": "Search inventory items…",
-  "/app/booking-reporting": "Search booking reports…",
+  "/app/booking-reporting": "Search book keeping…",
+  "/app/sales-reporting": "Search sales reports…",
   "/app/analytics": "Search reports…",
   "/app/settings/team": "Search team members…",
   "/app/settings/organization": "Search settings…",
@@ -44,32 +74,45 @@ function SidebarContent({ pathname, businessName, userRole, selectedFeatures, al
     return pathname.startsWith(href);
   };
 
-  // For admin: use selectedFeatures from subscription
-  // For others: use allowedFeatures
-  const allFeatureIds = ["messaging", "contacts", "inventory", "analytics", "automation", "bookingReporting", "finance"];
-  let activeFeatures: string[];
-  
+  const allModuleIds = NAV_SUB_MODULES;
+  let activeModules: string[];
+
   if (userRole === "ADMIN") {
-    activeFeatures = selectedFeatures && selectedFeatures.length > 0 ? selectedFeatures : allFeatureIds;
+    activeModules = selectedFeatures && selectedFeatures.length > 0 ? selectedFeatures : allModuleIds;
   } else {
-    activeFeatures = allowedFeatures && allowedFeatures.length > 0 ? allowedFeatures : [];
+    activeModules = allowedFeatures && allowedFeatures.length > 0 ? allowedFeatures : [];
   }
 
-  // Filter nav items:
-  // - alwaysShow items
-  // - items where featureId is in activeFeatures
-  // - and role check
+  const isModuleVisible = (moduleId?: string) => {
+    if (!moduleId) return true;
+    if (userRole === "ADMIN") return activeModules.includes(moduleId);
+    return activeModules.includes(moduleId);
+  };
+
   const filteredNav = nav.filter(item => {
-    // Role check
-    const hasRole = !userRole || item.roles.includes(userRole);
-    if (!hasRole) return false;
-
-    // Always show items
-    if (item.alwaysShow) return true;
-
-    // Feature check
-    return activeFeatures.includes(item.featureId);
+    if (item.roles && !item.roles.includes(userRole || "")) return false;
+    if (item.alwaysShow && !item.children) return true;
+    if (item.children) {
+      return item.children.some((child: any) => isModuleVisible(child.moduleId));
+    }
+    if (item.moduleId) return isModuleVisible(item.moduleId);
+    return true;
   });
+
+  const getDefaultExpanded = (item: any): boolean => {
+    if (!item.children) return false;
+    return item.children.some((child: any) => pathname.startsWith(child.href));
+  };
+
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(() => 
+    filteredNav.filter(getDefaultExpanded).map((item: any) => item.label)
+  );
+
+  const toggleMenu = (label: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-sidebar">
@@ -84,21 +127,66 @@ function SidebarContent({ pathname, businessName, userRole, selectedFeatures, al
       </div>
 
       <nav className="px-3 mt-2 space-y-1 flex-1">
-        {filteredNav.map(({ href, label, icon: Icon, exact }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition",
-              isActive(href, exact)
-                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-card"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/60"
-            )}
-          >
-            <Icon className="h-[18px] w-[18px]" />
-            {label}
-          </Link>
-        ))}
+        {filteredNav.map((item) => {
+          if (item.children) {
+            const isExpanded = expandedMenus.includes(item.label);
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="space-y-1">
+                <button
+                  onClick={() => toggleMenu(item.label)}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition",
+                    isExpanded ? "bg-sidebar-accent/60 text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/40"
+                  )}
+                >
+                  {Icon && <Icon className="h-[18px] w-[18px]" />}
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                {isExpanded && (
+                  <div className="ml-4 pl-4 border-l border-sidebar-border space-y-1">
+                    {item.children.filter((child: any) => isModuleVisible(child.moduleId)).map((child: any) => {
+                      const ChildIcon = child.icon;
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition",
+                            isActive(child.href, child.exact || false)
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-card"
+                              : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                          )}
+                        >
+                          {ChildIcon && <ChildIcon className="h-[16px] w-[16px]" />}
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition",
+                isActive(item.href, item.exact || false)
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-card"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+              )}
+            >
+              {Icon && <Icon className="h-[18px] w-[18px]" />}
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       {(userRole === 'ADMIN' || userRole === 'MESSAGING_MANAGER') && (

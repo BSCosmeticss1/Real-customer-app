@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Plus, Search, Filter, ArrowUpDown, MoreHorizontal, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { Package, Plus, Search, Filter, ArrowUpDown, Pencil, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,25 +36,31 @@ interface UserOption {
   name: string;
 }
 
+const UNITS = ["piece", "kg", "gram", "liter", "ml", "box", "carton", "pack", "bottle", "bag", "meter", "roll"];
+
+const emptyForm = {
+  name: "",
+  sku: "",
+  category: "",
+  description: "",
+  quantity: "0",
+  reorderLevel: "10",
+  price: "0",
+  costPrice: "0",
+  warehouse: "",
+  unit: "piece",
+};
+
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
-  const [formData, setFormData] = useState({
-    name: "",
-    sku: "",
-    category: "",
-    description: "",
-    quantity: "0",
-    reorderLevel: "10",
-    price: "0",
-    costPrice: "0",
-    warehouse: "Main Warehouse",
-    unit: "piece"
-  });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [formData, setFormData] = useState(emptyForm);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -105,11 +111,13 @@ export default function InventoryPage() {
     fetchProducts();
   }, [selectedUserId]);
 
-  const handleAddItem = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_URL}/inventory`, {
-        method: "POST",
+      const url = editingId ? `${API_URL}/inventory/${editingId}` : `${API_URL}/inventory`;
+      const method = editingId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${getToken()}`
@@ -124,27 +132,38 @@ export default function InventoryPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: "Success", description: "Product added successfully" });
-        setAddDialogOpen(false);
-        setFormData({
-          name: "",
-          sku: "",
-          category: "",
-          description: "",
-          quantity: "0",
-          reorderLevel: "10",
-          price: "0",
-          costPrice: "0",
-          warehouse: "Main Warehouse",
-          unit: "piece"
-        });
+        toast({ title: "Success", description: editingId ? "Product updated successfully" : "Product added successfully" });
+        setDialogOpen(false);
+        setEditingId(null);
+        setFormData(emptyForm);
         fetchProducts();
       } else {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
     } catch (err) {
-      console.error("Failed to add product:", err);
-      toast({ title: "Error", description: "Failed to add product", variant: "destructive" });
+      console.error("Failed to save product:", err);
+      toast({ title: "Error", description: "Failed to save product", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTargetId) return;
+    try {
+      const res = await fetch(`${API_URL}/inventory/${deleteTargetId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Success", description: "Product removed successfully" });
+        setDeleteTargetId(null);
+        fetchProducts();
+      } else {
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Failed to delete product:", err);
+      toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
     }
   };
 
@@ -173,8 +192,25 @@ export default function InventoryPage() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const startEdit = (product: Product) => {
+    setEditingId(product.id);
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      category: product.category || "",
+      description: product.description || "",
+      quantity: String(product.quantity),
+      reorderLevel: String(product.reorderLevel),
+      price: String(product.price),
+      costPrice: String(product.costPrice),
+      warehouse: product.warehouse,
+      unit: product.unit,
+    });
+    setDialogOpen(true);
+  };
+
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -205,7 +241,7 @@ export default function InventoryPage() {
           <Button variant="outline" className="flex-1 sm:flex-none rounded-xl px-6 h-12 font-medium" onClick={handleExport}>
             Export CSV
           </Button>
-          <Button className="flex-1 sm:flex-none rounded-xl px-6 h-12 font-medium shadow-deep bg-primary hover:bg-primary-glow" onClick={() => setAddDialogOpen(true)}>
+          <Button className="flex-1 sm:flex-none rounded-xl px-6 h-12 font-medium shadow-deep bg-primary hover:bg-primary-glow" onClick={() => { setEditingId(null); setFormData(emptyForm); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" /> Add Item
           </Button>
         </div>
@@ -215,7 +251,7 @@ export default function InventoryPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <div className="rounded-2xl bg-card p-6 shadow-card flex items-center gap-4">
           <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary/10 text-primary grid place-items-center shrink-0">
-            <Package className="h-5 w-5 sm:h-6 sm:w-6" />
+            <Package className="h-5 w-5 sm:h-6 sm:h-6" />
           </div>
           <div>
             <div className="label-eyebrow text-[10px] sm:text-xs">Total Items</div>
@@ -224,7 +260,7 @@ export default function InventoryPage() {
         </div>
         <div className="rounded-2xl bg-card p-6 shadow-card flex items-center gap-4">
           <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-warning-soft text-warning grid place-items-center shrink-0">
-            <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />
+            <AlertTriangle className="h-5 w-5 sm:h-6 sm:h-6 text-yellow-500" />
           </div>
           <div>
             <div className="label-eyebrow text-[10px] sm:text-xs">Low Stock</div>
@@ -233,7 +269,7 @@ export default function InventoryPage() {
         </div>
         <div className="rounded-2xl bg-card p-6 shadow-card flex items-center gap-4">
           <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-success-soft text-success grid place-items-center shrink-0">
-            <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+            <CheckCircle2 className="h-5 w-5 sm:h-6 sm:h-6" />
           </div>
           <div>
             <div className="label-eyebrow text-[10px] sm:text-xs">Active Products</div>
@@ -242,23 +278,23 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Inventory Table UI */}
+      {/* Inventory Table */}
       <div className="rounded-2xl bg-card border border-border shadow-card overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row gap-4 flex-1">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Filter inventory..." 
-                className="pl-9 rounded-xl border-border bg-background" 
+              <Input
+                placeholder="Search by name or SKU..."
+                className="pl-9 rounded-xl border-border bg-background"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             {users.length > 1 && (
               <div className="w-full sm:w-48">
-                <Select 
-                  value={selectedUserId || "all"} 
+                <Select
+                  value={selectedUserId || "all"}
                   onValueChange={(value) => setSelectedUserId(value === "all" ? undefined : value)}
                 >
                   <SelectTrigger className="rounded-xl border-border bg-background">
@@ -276,16 +312,8 @@ export default function InventoryPage() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="rounded-lg text-xs sm:text-sm">
-              <Filter className="h-4 w-4 mr-2" /> Filter
-            </Button>
-            <Button variant="ghost" size="sm" className="rounded-lg text-xs sm:text-sm">
-              <ArrowUpDown className="h-4 w-4 mr-2" /> Sort
-            </Button>
-          </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">Loading inventory...</div>
@@ -334,9 +362,26 @@ export default function InventoryPage() {
                         </div>
                       </td>
                       <td className="px-4 sm:px-6 py-4 text-right">
-                        <Button variant="ghost" size="icon" className="rounded-lg">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-lg"
+                            onClick={() => startEdit(item)}
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-lg"
+                            onClick={() => setDeleteTargetId(item.id)}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -353,62 +398,167 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Add Item Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      {/* Add/Edit Item Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Inventory Item</DialogTitle>
+            <DialogTitle>{editingId ? "Edit Inventory Item" : "Add New Inventory Item"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddItem} className="space-y-4 mt-4">
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Product Name *</Label>
+              <Input
+                id="name"
+                required
+                placeholder="e.g. Premium Rice 50kg"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="name">Product Name</Label>
-                <Input id="name" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-              </div>
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU</Label>
-                <Input id="sku" required value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
+                <Label htmlFor="sku">SKU / Item Code *</Label>
+                <Input
+                  id="sku"
+                  required
+                  placeholder="e.g. RICE-50KG-001"
+                  value={formData.sku}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Input id="category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} />
+                <Input
+                  id="category"
+                  placeholder="e.g. Grains, Beverages"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                placeholder="Brief description of the product"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity in Stock *</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  required
+                  min="0"
+                  placeholder="0"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input id="quantity" type="number" required value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
+                <Label htmlFor="reorderLevel">Low Stock Alert Level *</Label>
+                <Input
+                  id="reorderLevel"
+                  type="number"
+                  required
+                  min="0"
+                  placeholder="10"
+                  value={formData.reorderLevel}
+                  onChange={(e) => setFormData({ ...formData, reorderLevel: e.target.value })}
+                />
+                <p className="text-[10px] text-muted-foreground">Alert triggers when stock reaches this number</p>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="reorderLevel">Reorder Level</Label>
-                <Input id="reorderLevel" type="number" required value={formData.reorderLevel} onChange={(e) => setFormData({ ...formData, reorderLevel: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Price (₦)</Label>
-                <Input id="price" type="number" step="0.01" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} />
+                <Label htmlFor="price">Selling Price (₦) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  required
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="costPrice">Cost Price (₦)</Label>
-                <Input id="costPrice" type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })} />
+                <Input
+                  id="costPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={formData.costPrice}
+                  onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="warehouse">Warehouse / Location</Label>
+                <Input
+                  id="warehouse"
+                  placeholder="e.g. Main Warehouse"
+                  value={formData.warehouse}
+                  onChange={(e) => setFormData({ ...formData, warehouse: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warehouse">Warehouse</Label>
-                <Input id="warehouse" value={formData.warehouse} onChange={(e) => setFormData({ ...formData, warehouse: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit</Label>
-                <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} />
-              </div>
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Input id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+                <Label htmlFor="unit">Unit of Measurement</Label>
+                <Select value={formData.unit} onValueChange={(value) => setFormData({ ...formData, unit: value })}>
+                  <SelectTrigger className="rounded-xl border-border bg-background">
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNITS.map((unit) => (
+                      <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Add Item</Button>
+              <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); setEditingId(null); setFormData(emptyForm); }}>Cancel</Button>
+              <Button type="submit">{editingId ? "Update Item" : "Add Item"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTargetId && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-card border border-border rounded-3xl shadow-deep w-full max-w-sm">
+            <div className="p-6 text-center">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 text-destructive grid place-items-center mx-auto mb-4">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h3 className="font-display text-xl font-semibold mb-2">Delete Item</h3>
+              <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete this inventory item? This action cannot be undone.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTargetId(null)}
+                  className="flex-1 bg-secondary text-foreground rounded-xl py-3 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 bg-destructive text-destructive-foreground rounded-xl py-3 font-semibold shadow-deep hover:bg-destructive/90 transition"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

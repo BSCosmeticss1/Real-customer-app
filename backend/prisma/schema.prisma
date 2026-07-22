@@ -57,6 +57,7 @@ model User {
   templates         MessageTemplate[]
   payments          Payment[]
   bookings          Booking[]
+  salesReports      SalesReport[]
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -309,4 +310,27 @@ model Payment {
   @@index([userId, status])
   @@index([reference])
   @@map("payments")
+}
+
+model SalesReport {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serialNumber     Int
+  customerName     String
+  customerAddress  String?
+  quantity         Int       @default(1)
+  item             String
+  amountPaid       Float     @default(0)
+  paid             Boolean   @default(false)
+  balance          Float     @default(0)
+  date             DateTime  @default(now())
+  accountHistory   String?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId, date(sort: Desc)])
+  @@index([userId, customerName])
+  @@map("sales_reports")
 }

@@ -1,22 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, UserPlus, Loader2, Trash2, Key, Power, MessageSquare, Users, Package, BarChart3, Sparkles, Calendar, CreditCard, ChevronDown } from "lucide-react";
+import { Plus, UserPlus, Loader2, Trash2, Key, Power, MessageSquare, Phone, Mail, Sparkles, Users, Package, BarChart3, Calendar, CreditCard, ChevronDown, ClipboardList, TrendingUp, LineChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-const FEATURE_MODULES = [
-  { id: "messaging", name: "Messaging", icon: MessageSquare },
-  { id: "contacts", name: "Contacts", icon: Users },
-  { id: "inventory", name: "Inventory", icon: Package },
-  { id: "analytics", name: "Analytics", icon: BarChart3 },
-  { id: "automation", name: "Automation", icon: Sparkles },
-  { id: "bookingReporting", name: "Booking & Reporting", icon: Calendar },
-  { id: "finance", name: "Finance", icon: CreditCard },
+export const SUB_MODULES = [
+  { id: "messaging", name: "Messaging", path: "/app/messaging", icon: MessageSquare, group: "Communication" },
+  { id: "sms", name: "SMS", path: "/app/sms", icon: Phone, group: "Communication" },
+  { id: "email", name: "Email", path: "/app/email", icon: Mail, group: "Communication" },
+  { id: "automation", name: "Automation", path: "/app/automation", icon: Sparkles, group: "Communication" },
+  { id: "contacts", name: "All Contacts", path: "/app/contacts", icon: Users, group: "Contacts" },
+  { id: "inventory", name: "Inventory", path: "/app/inventory", icon: Package, group: "Inventory" },
+  { id: "book-keeping", name: "Book Keeping", path: "/app/booking-reporting", icon: ClipboardList, group: "Reports" },
+  { id: "sales-reporting", name: "Sales Reporting", path: "/app/sales-reporting", icon: TrendingUp, group: "Reports" },
+  { id: "analytics", name: "Analytics", path: "/app/analytics", icon: LineChart, group: "Reports" },
 ];
+
+export const PLAN_MODULES = {
+  standard: ["messaging", "contacts", "book-keeping", "sales-reporting"],
+  premium: SUB_MODULES.map(m => m.id),
+  enterprise: SUB_MODULES.map(m => m.id),
+};
 
 export default function Team() {
   const [members, setMembers] = useState<any[]>([]);
@@ -25,9 +33,10 @@ export default function Team() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [planUsage, setPlanUsage] = useState<any>(null);
   const [inviteData, setInviteData] = useState({
     email: "",
-    role: "MESSAGING_MANAGER", // Use this as default staff role
+    role: "MESSAGING_MANAGER",
     name: "",
     allowedFeatures: [] as string[]
   });
@@ -39,8 +48,6 @@ export default function Team() {
     allowedFeatures: [] as string[]
   });
   const [updating, setUpdating] = useState(false);
-
-  // We can keep roles for backward compatibility but focus on features
 
   const fetchMembers = async () => {
     try {
@@ -62,15 +69,25 @@ export default function Team() {
   const fetchCurrentUser = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/me`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setCurrentUser(data.data);
-        // Default allowedFeatures to all admin's paid features
-        const adminFeatures = data.data.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
+      const [userRes, usageRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/me`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/plan-usage`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        })
+      ]);
+      
+      const userData = await userRes.json();
+      const usageData = await usageRes.json();
+      
+      if (userData.success) {
+        setCurrentUser(userData.data);
+        const adminFeatures = userData.data.subscription?.selectedFeatures || PLAN_MODULES.premium;
         setInviteData(prev => ({ ...prev, allowedFeatures: adminFeatures }));
+      }
+      if (usageData.success) {
+        setPlanUsage(usageData.data);
       }
     } catch (err) {
       console.error("Failed to fetch current user", err);
@@ -103,8 +120,7 @@ export default function Team() {
       const data = await res.json();
       if (data.success) {
         toast.success("Invite sent successfully!");
-        // Reset with admin's paid features as default
-        const adminFeatures = currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
+        const adminFeatures = currentUser?.subscription?.selectedFeatures || PLAN_MODULES.premium;
         setInviteData({ email: "", role: "MESSAGING_MANAGER", name: "", allowedFeatures: adminFeatures });
         fetchMembers();
       } else {
@@ -201,13 +217,37 @@ export default function Team() {
     }
   };
 
+  const toggleSubModule = (moduleId: string, isInvite: boolean = false) => {
+    if (isInvite) {
+      setInviteData(prev => ({
+        ...prev,
+        allowedFeatures: prev.allowedFeatures.includes(moduleId)
+          ? prev.allowedFeatures.filter(id => id !== moduleId)
+          : [...prev.allowedFeatures, moduleId]
+      }));
+    } else {
+      setEditData(prev => ({
+        ...prev,
+        allowedFeatures: prev.allowedFeatures.includes(moduleId)
+          ? prev.allowedFeatures.filter(id => id !== moduleId)
+          : [...prev.allowedFeatures, moduleId]
+      }));
+    }
+  };
+
+  const groupedModules = SUB_MODULES.reduce((acc, mod) => {
+    if (!acc[mod.group]) acc[mod.group] = [];
+    acc[mod.group].push(mod);
+    return acc;
+  }, {} as Record<string, typeof SUB_MODULES>);
+
   return (
     <div className="space-y-10 max-w-6xl">
       <div className="flex items-start justify-between">
         <div>
           <div className="label-eyebrow">Admin Console</div>
           <h1 className="font-display text-5xl font-semibold text-foreground mt-2">Team management</h1>
-          <p className="text-muted-foreground mt-3 text-lg">Invite your staff and assign access to specific features to manage your business operations.</p>
+          <p className="text-muted-foreground mt-3 text-lg">Invite your staff and assign access to specific modules and pages.</p>
         </div>
       </div>
 
@@ -220,7 +260,7 @@ export default function Team() {
           <h2 className="text-xl font-semibold">Invite a new member</h2>
         </div>
         
-        <form onSubmit={handleInvite} className="grid md:grid-cols-4 gap-4 items-end">
+        <form onSubmit={handleInvite} className="grid md:grid-cols-4 gap-4 items-start">
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Staff Name</label>
             <input 
@@ -240,66 +280,94 @@ export default function Team() {
               className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 transition" 
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Allow Access to Features</label>
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Allow Access to Modules</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="secondary" className="w-full justify-between border border-border">
                   {inviteData.allowedFeatures.length === 0 
-                    ? "Select features..." 
-                    : inviteData.allowedFeatures.length === 1 
-                      ? FEATURE_MODULES.find(f => f.id === inviteData.allowedFeatures[0])?.name 
-                      : `${inviteData.allowedFeatures.length} features selected`}
+                    ? "Select modules..." 
+                    : `${inviteData.allowedFeatures.length} module(s) selected`}
                   <ChevronDown className="h-4 w-4 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 p-2">
-                <div className="space-y-2">
-                  {(() => {
-                    const adminFeatures = currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
-                    return FEATURE_MODULES.filter(feature => adminFeatures.includes(feature.id)).map(feature => {
-                      const Icon = feature.icon;
-                      const isSelected = inviteData.allowedFeatures.includes(feature.id);
-                      return (
-                        <div 
-                          key={feature.id}
-                          className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition"
-                        >
-                          <Checkbox 
-                            id={`invite-feature-${feature.id}`}
-                            checked={isSelected}
-                            onCheckedChange={(checked: boolean | 'indeterminate') => {
-                              setInviteData(prev => ({
-                                ...prev,
-                                allowedFeatures: checked === true 
-                                  ? [...prev.allowedFeatures, feature.id]
-                                  : prev.allowedFeatures.filter(f => f !== feature.id)
-                              }));
-                            }}
-                          />
-                          <Label htmlFor={`invite-feature-${feature.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
-                            <Icon className="h-4 w-4 text-muted-foreground" />
-                            {feature.name}
-                          </Label>
-                        </div>
-                      );
-                    });
-                  })()}
+              <PopoverContent className="w-[320px] p-3">
+                <div className="space-y-4 max-h-[300px] overflow-y-auto">
+                  {Object.entries(groupedModules).map(([group, modules]) => (
+                    <div key={group}>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{group}</div>
+                      <div className="space-y-2">
+                        {modules.map((module) => {
+                          const Icon = module.icon;
+                          const isSelected = inviteData.allowedFeatures.includes(module.id);
+                          return (
+                            <div 
+                              key={module.id}
+                              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition"
+                            >
+                              <Checkbox 
+                                id={`invite-module-${module.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked: boolean | 'indeterminate') => {
+                                  toggleSubModule(module.id, true);
+                                }}
+                              />
+                              <Label htmlFor={`invite-module-${module.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                {module.name}
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </PopoverContent>
             </Popover>
           </div>
-          <button 
-            disabled={inviting}
-            className="bg-primary text-primary-foreground rounded-xl px-6 py-3 text-sm font-semibold hover:bg-primary-glow transition shadow-deep flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Send Invite
-          </button>
+          <div className="md:col-span-4">
+            <button 
+              disabled={inviting}
+              className="bg-primary text-primary-foreground rounded-xl px-6 py-3 text-sm font-semibold hover:bg-primary-glow transition shadow-deep flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Send Invite
+            </button>
+          </div>
         </form>
         <p className="text-[11px] text-muted-foreground mt-4 px-1 italic">
           Staff will receive an email with their login credentials and will be asked to change their password on first login.
         </p>
+        
+        {/* Plan Usage */}
+        {planUsage && (
+          <div className="mt-6 p-4 bg-secondary/50 rounded-xl space-y-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan Limits</div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Plan</span>
+              <span className="font-medium capitalize">{planUsage.plan}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Team Members</span>
+              <span className={`font-medium ${planUsage.usage.users >= planUsage.limits.users ? 'text-destructive' : ''}`}>
+                {planUsage.usage.users} / {planUsage.limits.users === 999 ? '∞' : planUsage.limits.users}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Contacts</span>
+              <span className={`font-medium ${planUsage.usage.contacts >= planUsage.limits.contacts ? 'text-destructive' : ''}`}>
+                {planUsage.usage.contacts.toLocaleString()} / {planUsage.limits.contacts === 99999 ? '∞' : planUsage.limits.contacts.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Messages/mo</span>
+              <span className={`font-medium ${planUsage.usage.messages >= planUsage.limits.messages ? 'text-destructive' : ''}`}>
+                {planUsage.usage.messages.toLocaleString()} / {planUsage.limits.messages === 999999 ? '∞' : planUsage.limits.messages.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Members Table */}
@@ -315,7 +383,7 @@ export default function Team() {
             <thead>
               <tr className="bg-muted/50 border-b border-border">
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Member</th>
-                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Allowed Features</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Allowed Modules</th>
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</th>
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
               </tr>
@@ -349,8 +417,8 @@ export default function Team() {
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex flex-wrap gap-1">
-                      {(m.allowedFeatures || currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id)).map((featureId: string) => {
-                        const feature = FEATURE_MODULES.find(f => f.id === featureId);
+                      {(m.allowedFeatures || []).map((featureId: string) => {
+                        const feature = SUB_MODULES.find(f => f.id === featureId);
                         if (!feature) return null;
                         return (
                           <span key={featureId} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-secondary text-secondary-foreground">
@@ -442,7 +510,7 @@ export default function Team() {
           <div className="max-w-2xl w-full bg-card border border-border rounded-3xl shadow-deep p-8 animate-in zoom-in duration-300">
             <div className="mb-6">
               <h2 className="font-display text-2xl font-semibold">Edit Team Member</h2>
-              <p className="text-muted-foreground mt-1">Update member details and allowed features</p>
+              <p className="text-muted-foreground mt-1">Update member details and allowed modules</p>
             </div>
 
             <form onSubmit={handleUpdateMember} className="space-y-4">
@@ -456,50 +524,47 @@ export default function Team() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Allow Access to Features</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Allow Access to Modules</label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="secondary" className="w-full justify-between border border-border">
                       {editData.allowedFeatures.length === 0 
-                        ? "Select features..." 
-                        : editData.allowedFeatures.length === 1 
-                          ? FEATURE_MODULES.find(f => f.id === editData.allowedFeatures[0])?.name 
-                          : `${editData.allowedFeatures.length} features selected`}
+                        ? "Select modules..." 
+                        : `${editData.allowedFeatures.length} module(s) selected`}
                       <ChevronDown className="h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80 p-2">
-                    <div className="space-y-2">
-                      {(() => {
-                        const adminFeatures = currentUser?.subscription?.selectedFeatures || FEATURE_MODULES.map(f => f.id);
-                        return FEATURE_MODULES.filter(feature => adminFeatures.includes(feature.id)).map(feature => {
-                          const Icon = feature.icon;
-                          const isSelected = editData.allowedFeatures.includes(feature.id);
-                          return (
-                            <div 
-                              key={feature.id}
-                              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition"
-                            >
-                              <Checkbox 
-                                id={`edit-feature-${feature.id}`}
-                                checked={isSelected}
-                                onCheckedChange={(checked: boolean | 'indeterminate') => {
-                                  setEditData(prev => ({
-                                    ...prev,
-                                    allowedFeatures: checked === true 
-                                      ? [...prev.allowedFeatures, feature.id]
-                                      : prev.allowedFeatures.filter(f => f !== feature.id)
-                                  }));
-                                }}
-                              />
-                              <Label htmlFor={`edit-feature-${feature.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
-                                <Icon className="h-4 w-4 text-muted-foreground" />
-                                {feature.name}
-                              </Label>
-                            </div>
-                          );
-                        });
-                      })()}
+                  <PopoverContent className="w-[320px] p-3">
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto">
+                      {Object.entries(groupedModules).map(([group, modules]) => (
+                        <div key={group}>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{group}</div>
+                          <div className="space-y-2">
+                            {modules.map((module) => {
+                              const Icon = module.icon;
+                              const isSelected = editData.allowedFeatures.includes(module.id);
+                              return (
+                                <div 
+                                  key={module.id}
+                                  className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition"
+                                >
+                                  <Checkbox 
+                                    id={`edit-module-${module.id}`}
+                                    checked={isSelected}
+                                    onCheckedChange={(checked: boolean | 'indeterminate') => {
+                                      toggleSubModule(module.id, false);
+                                    }}
+                                  />
+                                  <Label htmlFor={`edit-module-${module.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                    <Icon className="h-4 w-4 text-muted-foreground" />
+                                    {module.name}
+                                  </Label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </PopoverContent>
                 </Popover>

@@ -79,6 +79,7 @@ app.use('/payments', require('./routes/payments'));
 app.use('/users', require('./routes/users'));
 app.use('/onboarding', require('./routes/onboarding'));
 app.use('/bookings', require('./routes/bookings'));
+app.use('/sales-reports', require('./routes/salesReports'));
 
 // 404 Handler
 app.use((req, res) => {

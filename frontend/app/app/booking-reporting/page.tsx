@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, TrendingUp, TrendingDown, Download, Calendar as CalendarIcon, PieChart, BarChart3, Users, Plus, X } from "lucide-react";
+import { ClipboardList, TrendingUp, TrendingDown, Download, Calendar as CalendarIcon, PieChart, BarChart3, Users, Plus, X, Trash2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,17 +9,33 @@ import { format } from "date-fns";
 import { useState } from "react";
 import { toast } from "sonner";
 
+interface BookingRow {
+  id: string;
+  bookingNumber: string;
+  customerName: string;
+  service: string;
+  date: string;
+  amount: number;
+  status: string;
+  notes: string;
+}
+
+const emptyBooking: Omit<BookingRow, "id" | "bookingNumber"> = {
+  customerName: "",
+  service: "",
+  date: new Date().toISOString().split("T")[0],
+  amount: 0,
+  status: "Pending",
+  notes: "",
+};
+
 export default function BookingReportingPage() {
   const queryClient = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newBooking, setNewBooking] = useState({
-    customerName: "",
-    service: "",
-    date: new Date().toISOString().split('T')[0],
-    amount: "",
-    status: "Pending",
-    notes: ""
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [viewNotesId, setViewNotesId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Omit<BookingRow, "id" | "bookingNumber">>(emptyBooking);
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["bookingStats"],
@@ -33,7 +49,19 @@ export default function BookingReportingPage() {
     },
   });
 
-  const createBookingMutation = useMutation({
+  const { data: bookings, isLoading: bookingsLoading, refetch } = useQuery({
+    queryKey: ["bookings"],
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/bookings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to fetch bookings");
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
     mutationFn: async () => {
       const token = localStorage.getItem("token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/bookings`, {
@@ -43,9 +71,9 @@ export default function BookingReportingPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          ...newBooking,
-          amount: parseFloat(newBooking.amount) || 0,
-          date: new Date(newBooking.date).toISOString()
+          ...formData,
+          amount: parseFloat(String(formData.amount)) || 0,
+          date: new Date(formData.date).toISOString(),
         }),
       });
       if (!res.ok) throw new Error("Failed to create booking");
@@ -54,41 +82,107 @@ export default function BookingReportingPage() {
     onSuccess: () => {
       toast.success("Booking created successfully!");
       setShowAddModal(false);
-      setNewBooking({
-        customerName: "",
-        service: "",
-        date: new Date().toISOString().split('T')[0],
-        amount: "",
-        status: "Pending",
-        notes: ""
-      });
+      setEditingId(null);
+      setFormData(emptyBooking);
       queryClient.invalidateQueries({ queryKey: ["bookingStats"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to create booking");
-    },
+    onError: (err: any) => toast.error(err.message || "Failed to create booking"),
   });
 
-  const handleCreateBooking = (e: React.FormEvent) => {
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/bookings/${editingId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...formData,
+          amount: parseFloat(String(formData.amount)) || 0,
+          date: new Date(formData.date).toISOString(),
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update booking");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Booking updated successfully!");
+      setShowAddModal(false);
+      setEditingId(null);
+      setFormData(emptyBooking);
+      queryClient.invalidateQueries({ queryKey: ["bookingStats"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to update booking"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/bookings/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete booking");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Booking deleted successfully!");
+      setDeleteTargetId(null);
+      queryClient.invalidateQueries({ queryKey: ["bookingStats"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to delete booking"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBooking.customerName || !newBooking.service) {
+    if (!formData.customerName || !formData.service) {
       toast.error("Customer name and service are required");
       return;
     }
-    createBookingMutation.mutate();
+    if (editingId) {
+      updateMutation.mutate();
+    } else {
+      createMutation.mutate();
+    }
   };
 
-  if (isLoading) {
+  const startEdit = (booking: BookingRow) => {
+    setEditingId(booking.id);
+    setFormData({
+      customerName: booking.customerName,
+      service: booking.service,
+      date: booking.date.split("T")[0],
+      amount: booking.amount,
+      status: booking.status,
+      notes: booking.notes,
+    });
+    setShowAddModal(true);
+  };
+
+  const recentBookings = bookings || [];
+  const topServices = stats?.topServices || [
+    { name: "Premium Installation", share: "42%", color: "bg-primary" },
+    { name: "Standard Maintenance", share: "28%", color: "bg-accent" },
+    { name: "Software Upgrade", share: "15%", color: "bg-secondary" },
+    { name: "Consultation", share: "10%", color: "bg-muted-foreground" },
+  ];
+
+  if (isLoading || bookingsLoading) {
     return (
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <div className="label-eyebrow text-primary">Performance Metrics</div>
-            <h1 className="font-display text-3xl sm:text-5xl font-semibold text-foreground mt-2">Booking Reporting</h1>
+            <div className="h-4 bg-secondary rounded w-32 mb-2" />
+            <div className="h-8 bg-secondary rounded w-64" />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[1,2,3,4].map(i => (
+          {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="rounded-2xl shadow-card border-none bg-card animate-pulse">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                 <div className="h-4 bg-secondary rounded w-24" />
@@ -104,27 +198,19 @@ export default function BookingReportingPage() {
     );
   }
 
-  const recentBookings = stats?.recentBookings || [];
-  const topServices = stats?.topServices || [
-    { name: "Premium Installation", share: "42%", color: "bg-primary" },
-    { name: "Standard Maintenance", share: "28%", color: "bg-accent" },
-    { name: "Software Upgrade", share: "15%", color: "bg-secondary" },
-    { name: "Consultation", share: "10%", color: "bg-muted-foreground" },
-  ];
-
   return (
     <div className="space-y-8">
       {/* Title row */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="label-eyebrow text-primary">Performance Metrics</div>
-          <h1 className="font-display text-3xl sm:text-5xl font-semibold text-foreground mt-2">Booking Reporting</h1>
+          <h1 className="font-display text-3xl sm:text-5xl font-semibold text-foreground mt-2">Book Keeping</h1>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1 sm:flex-none rounded-xl px-4 sm:px-6 h-12 font-medium text-xs sm:text-sm">
             <CalendarIcon className="h-4 w-4 mr-2" /> Last 30 Days
           </Button>
-          <Button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none rounded-xl px-4 sm:px-6 h-12 font-medium shadow-deep bg-primary hover:bg-primary-glow text-xs sm:text-sm">
+          <Button onClick={() => { setEditingId(null); setFormData(emptyBooking); setShowAddModal(true); }} className="flex-1 sm:flex-none rounded-xl px-4 sm:px-6 h-12 font-medium shadow-deep bg-primary hover:bg-primary-glow text-xs sm:text-sm">
             <Plus className="h-4 w-4 mr-2" /> New Booking
           </Button>
         </div>
@@ -150,7 +236,7 @@ export default function BookingReportingPage() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl sm:text-3xl font-bold">${stats?.grossRevenue?.toLocaleString() || 0}</div>
+            <div className="text-2xl sm:text-3xl font-bold">₦{stats?.grossRevenue?.toLocaleString() || 0}</div>
             <p className="text-[10px] sm:text-xs text-success flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3" /> +12% from last month
             </p>
@@ -198,17 +284,18 @@ export default function BookingReportingPage() {
                   <th className="pb-4">Date</th>
                   <th className="pb-4">Status</th>
                   <th className="pb-4 text-right">Amount</th>
+                  <th className="pb-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {recentBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
                       No bookings yet
                     </td>
                   </tr>
                 ) : (
-                  recentBookings.map((booking: any) => (
+                  recentBookings.map((booking: BookingRow) => (
                     <tr key={booking.id} className="hover:bg-secondary/30 transition-colors">
                       <td className="py-4">
                         <div className="font-medium text-foreground text-sm">{booking.customerName}</div>
@@ -228,7 +315,32 @@ export default function BookingReportingPage() {
                         </Badge>
                       </td>
                       <td className="py-4 text-right font-medium text-foreground text-sm">
-                        ${booking.amount?.toLocaleString() || 0}
+                        ₦{booking.amount?.toLocaleString() || 0}
+                      </td>
+                      <td className="py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => startEdit(booking)}
+                            className="text-xs text-primary hover:text-primary-glow font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteTargetId(booking.id)}
+                            className="text-xs text-destructive hover:text-destructive/80 font-medium flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </button>
+                          {booking.notes && (
+                            <button
+                              onClick={() => setViewNotesId(booking.id)}
+                              className="text-xs text-muted-foreground hover:text-foreground font-medium flex items-center gap-1"
+                              title="View Notes"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -240,28 +352,28 @@ export default function BookingReportingPage() {
 
         {/* Summary Card */}
         <div className="space-y-6">
-          <Card className="rounded-2xl shadow-card border-none bg-gradient-to-br from-primary to-primary-glow text-primary-foreground">
+          <Card className="rounded-2xl shadow-card border-none bg-card">
             <CardHeader>
-              <CardTitle className="font-display text-lg sm:text-xl">Monthly Goal</CardTitle>
+              <CardTitle className="font-display text-lg sm:text-xl">Overview</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex justify-between text-xs sm:text-sm">
-                  <span>Revenue Progress</span>
-                  <span className="font-semibold">{stats?.progressPercentage || 0}%</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Total Bookings</span>
+                  <span className="font-semibold text-sm sm:text-base">{stats?.totalBookings || 0}</span>
                 </div>
-                <div className="w-full bg-primary-foreground/20 rounded-full h-2">
-                  <div className="bg-white h-2 rounded-full" style={{ width: `${stats?.progressPercentage || 0}%` }} />
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(((stats?.totalBookings || 0) / 100) * 100, 100)}%` }} />
                 </div>
-                <p className="text-[10px] sm:text-xs text-primary-foreground/70">
-                  {stats?.remaining > 0 
-                    ? `You are $${stats?.remaining?.toLocaleString()} away from your monthly target. Keep it up!`
-                    : `Great job! You've exceeded your monthly goal!`
-                  }
+                <div className="flex items-center justify-between">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Completed</span>
+                  <span className="font-semibold text-sm sm:text-base text-success">
+                    {recentBookings.filter((b: BookingRow) => b.status === "Completed").length}
+                  </span>
+                </div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  {recentBookings.filter((b: BookingRow) => b.status === "Pending").length} pending bookings
                 </p>
-                <Button className="w-full bg-white text-primary hover:bg-primary-foreground/90 rounded-xl font-medium mt-2 text-xs sm:text-sm h-10 sm:h-12">
-                  View Goal Details
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -291,101 +403,160 @@ export default function BookingReportingPage() {
         </div>
       </div>
 
-      {/* Add Booking Modal */}
+      {/* Add/Edit Booking Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-card border border-border rounded-3xl shadow-deep w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-border flex items-center justify-between sticky top-0 bg-card">
-              <h3 className="font-display text-2xl font-semibold">New Booking</h3>
-              <button onClick={() => setShowAddModal(false)}>
+          <div className="bg-card border border-border rounded-3xl shadow-deep w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-border flex items-center justify-between sticky top-0 bg-card z-10">
+              <h3 className="font-display text-2xl font-semibold">{editingId ? "Edit Booking" : "New Booking"}</h3>
+              <button onClick={() => { setShowAddModal(false); setEditingId(null); setFormData(emptyBooking); }}>
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleCreateBooking} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Customer Name *</label>
-                <input 
-                  type="text"
-                  required
-                  value={newBooking.customerName}
-                  onChange={(e) => setNewBooking({...newBooking, customerName: e.target.value})}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="Enter customer name"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Service *</label>
-                <input 
-                  type="text"
-                  required
-                  value={newBooking.service}
-                  onChange={(e) => setNewBooking({...newBooking, service: e.target.value})}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="Enter service name"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Date</label>
-                <input 
-                  type="date"
-                  value={newBooking.date}
-                  onChange={(e) => setNewBooking({...newBooking, date: e.target.value})}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Amount</label>
-                <input 
-                  type="number"
-                  value={newBooking.amount}
-                  onChange={(e) => setNewBooking({...newBooking, amount: e.target.value})}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Status</label>
-                <select 
-                  value={newBooking.status}
-                  onChange={(e) => setNewBooking({...newBooking, status: e.target.value})}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Notes</label>
-                <textarea 
-                  value={newBooking.notes}
-                  onChange={(e) => setNewBooking({...newBooking, notes: e.target.value})}
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="Additional notes"
-                  rows={3}
-                />
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Customer Name *</label>
+                  <input 
+                    type="text"
+                    required
+                    value={formData.customerName}
+                    onChange={(e) => setFormData({...formData, customerName: e.target.value})}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Enter customer name"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Service *</label>
+                  <input 
+                    type="text"
+                    required
+                    value={formData.service}
+                    onChange={(e) => setFormData({...formData, service: e.target.value})}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Enter service name"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Date</label>
+                  <input 
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({...formData, date: e.target.value})}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Amount (₦)</label>
+                  <input 
+                    type="number"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Status</label>
+                  <select 
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">Notes</label>
+                  <textarea 
+                    value={formData.notes}
+                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Additional notes"
+                    rows={3}
+                  />
+                </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button 
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); setEditingId(null); setFormData(emptyBooking); }}
                   className="flex-1 bg-secondary text-foreground rounded-xl py-3 font-semibold"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
-                  disabled={createBookingMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                   className="flex-1 bg-primary text-primary-foreground rounded-xl py-3 font-semibold shadow-deep hover:bg-primary-glow transition disabled:opacity-50"
                 >
-                  {createBookingMutation.isPending ? "Creating..." : "Create Booking"}
+                  {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingId ? "Update Booking" : "Create Booking"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTargetId && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-card border border-border rounded-3xl shadow-deep w-full max-w-sm">
+            <div className="p-6 text-center">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 text-destructive grid place-items-center mx-auto mb-4">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h3 className="font-display text-xl font-semibold mb-2">Delete Booking</h3>
+              <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete this booking? This action cannot be undone.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTargetId(null)}
+                  className="flex-1 bg-secondary text-foreground rounded-xl py-3 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteMutation.mutate(deleteTargetId)}
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 bg-destructive text-destructive-foreground rounded-xl py-3 font-semibold shadow-deep hover:bg-destructive/90 transition disabled:opacity-50"
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Notes Modal */}
+      {viewNotesId && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-card border border-border rounded-3xl shadow-deep w-full max-w-md">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="font-display text-xl font-semibold">Booking Notes</h3>
+              <button onClick={() => setViewNotesId(null)}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-foreground whitespace-pre-wrap">
+                {(recentBookings.find((b: BookingRow) => b.id === viewNotesId)?.notes) || "No notes available."}
+              </p>
+            </div>
+            <div className="p-6 border-t border-border">
+              <button
+                onClick={() => setViewNotesId(null)}
+                className="w-full bg-secondary text-foreground rounded-xl py-3 font-semibold"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

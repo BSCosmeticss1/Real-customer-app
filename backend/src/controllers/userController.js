@@ -3,7 +3,6 @@ const { sendEmail } = require('../services/emailService');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
-// Roles (Prisma Enums)
 const ROLES = {
   ADMIN: 'ADMIN',
   INVENTORY_MANAGER: 'INVENTORY_MANAGER',
@@ -29,6 +28,35 @@ const ROLE_PERMISSIONS = {
   INVENTORY_MANAGER: ['inventory', 'stock_movements'],
   FINANCE_MANAGER: ['invoices', 'expenses', 'cashflow', 'dashboard'],
   MESSAGING_MANAGER: ['messaging', 'contacts', 'templates', 'logs'],
+};
+
+const ALL_SUB_MODULES = [
+  "messaging", "sms", "email", "automation",
+  "contacts", "inventory",
+  "book-keeping", "sales-reporting", "analytics"
+];
+
+const PLAN_MODULES = {
+  standard: ["messaging", "contacts", "book-keeping", "sales-reporting", "email"],
+  premium: ALL_SUB_MODULES,
+  enterprise: ALL_SUB_MODULES,
+};
+
+const PLAN_LIMITS = {
+  standard: { users: 3, contacts: 1000, messages: 5000 },
+  premium: { users: 10, contacts: 10000, messages: 50000 },
+  enterprise: { users: 999, contacts: 99999, messages: 999999 },
+};
+
+const getPlanLimits = (user) => {
+  const plan = user?.subscription?.plan || 'premium';
+  return PLAN_LIMITS[plan] || PLAN_LIMITS.premium;
+};
+
+const getUserModules = (user) => {
+  const plan = user?.subscription?.plan;
+  if (plan && PLAN_MODULES[plan]) return PLAN_MODULES[plan];
+  return user?.allowedFeatures || PLAN_MODULES.premium;
 };
 
 // ─── GET /users ───────────────────────────────────────────────────────────────
@@ -112,6 +140,35 @@ exports.createUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email already in use' });
     }
 
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true, allowedFeatures: true }
+    });
+
+    const limits = getPlanLimits(admin);
+    const currentUserCount = await prisma.user.count({
+      where: { createdBy: req.user.id, role: { not: 'ADMIN' } }
+    });
+
+    if (limits.users !== 999 && currentUserCount >= limits.users) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `User limit reached. Your ${admin?.subscription?.plan || 'current'} plan allows up to ${limits.users} users. Please upgrade your plan to add more team members.` 
+      });
+    }
+
+    let adminModules = [];
+    if (admin?.subscription?.plan && PLAN_MODULES[admin.subscription.plan]) {
+      adminModules = PLAN_MODULES[admin.subscription.plan];
+    } else if (admin?.allowedFeatures && Array.isArray(admin.allowedFeatures)) {
+      adminModules = admin.allowedFeatures;
+    } else {
+      adminModules = PLAN_MODULES.premium;
+    }
+
+    const requestedModules = Array.isArray(allowedFeatures) ? allowedFeatures : [];
+    const validModules = requestedModules.filter((m) => adminModules.includes(m));
+
     const tempPassword = crypto.randomBytes(5).toString('hex') + 'A1!';
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(tempPassword, salt);
@@ -125,9 +182,9 @@ exports.createUser = async (req, res, next) => {
         createdBy: req.user.id,
         isActive: true,
         mustChangePassword: true,
-        onboardingStatus: 'COMPLETED', // Staff don't need onboarding
-        isVerified: true, // Staff are verified by the admin
-        allowedFeatures: allowedFeatures || [],
+        onboardingStatus: 'COMPLETED',
+        isVerified: true,
+        allowedFeatures: validModules,
       },
     });
 
@@ -290,11 +347,28 @@ exports.updateUser = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
 
+    const admin = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true, allowedFeatures: true }
+    });
+
+    let adminModules = [];
+    if (admin?.subscription?.plan && PLAN_MODULES[admin.subscription.plan]) {
+      adminModules = PLAN_MODULES[admin.subscription.plan];
+    } else if (admin?.allowedFeatures && Array.isArray(admin.allowedFeatures)) {
+      adminModules = admin.allowedFeatures;
+    } else {
+      adminModules = PLAN_MODULES.premium;
+    }
+
     const data = {};
     if (name) data.name = name;
     if (email) data.email = email.toLowerCase();
     if (normalizedRole) data.role = normalizedRole;
-    if (allowedFeatures !== undefined) data.allowedFeatures = allowedFeatures;
+    if (allowedFeatures !== undefined) {
+      const requestedModules = Array.isArray(allowedFeatures) ? allowedFeatures : [];
+      data.allowedFeatures = requestedModules.filter((m) => adminModules.includes(m));
+    }
 
     const updated = await prisma.user.update({
       where: { id: req.params.id },

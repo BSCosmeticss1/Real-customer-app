@@ -157,6 +157,50 @@ exports.getMe = async (req, res) => {
   res.status(200).json({ success: true, data: req.user });
 };
 
+// ─── PROTECTED: Get plan usage ────────────────────────────────────────────────
+exports.getPlanUsage = async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true, role: true }
+    });
+
+    const plan = user?.subscription?.plan || 'premium';
+    const limits = {
+      standard: { users: 3, contacts: 1000, messages: 5000 },
+      premium: { users: 10, contacts: 10000, messages: 50000 },
+      enterprise: { users: 999, contacts: 99999, messages: 999999 },
+    }[plan] || { users: 10, contacts: 10000, messages: 50000 };
+
+    const [userCount, contactCount] = await Promise.all([
+      prisma.user.count({ where: { createdBy: req.user.id, role: { not: 'ADMIN' } } }),
+      prisma.contact.count({ where: { userId: req.user.id } }),
+    ]);
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const monthlyMessages = await prisma.messageLog.count({
+      where: { userId: req.user.id, sentAt: { gte: startOfMonth } }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        plan,
+        limits,
+        usage: {
+          users: userCount,
+          contacts: contactCount,
+          messages: monthlyMessages,
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── PROTECTED: Update profile ────────────────────────────────────────────────
 exports.updateProfile = async (req, res, next) => {
   try {

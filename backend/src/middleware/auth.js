@@ -67,3 +67,36 @@ exports.requireRole = (...roles) => (req, res, next) => {
 };
 
 exports.authorize = (...roles) => exports.requireRole(...roles);
+
+// ─── Feature-based access control ─────────────────────────────────────────────
+exports.authorizeFeature = (...modules) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { role: true, allowedFeatures: true, subscription: true },
+    });
+    
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+    
+    if (user.role === 'ADMIN') return next();
+    
+    const allowed = user.allowedFeatures || [];
+    if (allowed.includes('*')) return next();
+    
+    const hasAccess = modules.some(m => allowed.includes(m));
+    if (!hasAccess) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Access denied. Required: ${modules.join(' or ')}` 
+      });
+    }
+    
+    next();
+  };
+};

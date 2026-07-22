@@ -3,6 +3,7 @@ const { sendMessage } = require('../services/messagingService');
 const { sendEmail } = require('../services/emailService');
 const { paginateResult } = require('../middleware/paginate');
 const schedule = require('node-schedule');
+const { getPlanLimits } = require('./userController');
 
 // Store scheduled jobs in memory
 const scheduledJobs = {};
@@ -18,12 +19,25 @@ exports.sendNow = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'platform, content, and contacts are required' });
     }
 
-    console.log('[sendNow] Fetching user with id:', req.user.id);
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
     });
-    console.log('[sendNow] User found:', user?.id);
+    const limits = getPlanLimits(user);
     
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const monthlyMessageCount = await prisma.messageLog.count({
+      where: { userId: req.user.id, sentAt: { gte: startOfMonth } }
+    });
+
+    if (limits.messages !== 999999 && monthlyMessageCount + contactIds.length > limits.messages) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Monthly message limit reached. Your ${user?.subscription?.plan || 'current'} plan allows ${limits.messages.toLocaleString()} messages per month. You have used ${monthlyMessageCount.toLocaleString()} this month. Please upgrade your plan.` 
+      });
+    }
+
     console.log('[sendNow] Fetching contacts with ids:', contactIds);
     const contacts = await prisma.contact.findMany({
       where: { id: { in: contactIds }, userId: req.user.id },
@@ -212,7 +226,10 @@ exports.getScheduled = async (req, res, next) => {
         orderBy: { scheduledAt: 'asc' },
         skip,
         take: Number(limit),
-        include: { template: { select: { name: true } } },
+        include: { 
+          template: { select: { name: true } },
+          contacts: { select: { id: true, name: true } },
+        },
       }),
       prisma.scheduledMessage.count({ where }),
     ]);
@@ -255,6 +272,27 @@ exports.sendSMS = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Provide at least one contact or phone number',
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true }
+    });
+    const limits = getPlanLimits(user);
+    const totalRecipients = parsedContactIds.length + parsedNumbers.length;
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const monthlyMessageCount = await prisma.messageLog.count({
+      where: { userId: req.user.id, sentAt: { gte: startOfMonth } }
+    });
+
+    if (limits.messages !== 999999 && monthlyMessageCount + totalRecipients > limits.messages) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Monthly message limit reached. Your ${user?.subscription?.plan || 'current'} plan allows ${limits.messages.toLocaleString()} messages per month. Please upgrade your plan.` 
       });
     }
 
@@ -343,6 +381,27 @@ exports.sendEmail = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Provide at least one contact or email address',
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true }
+    });
+    const limits = getPlanLimits(user);
+    const totalRecipients = parsedContactIds.length + parsedEmails.length;
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const monthlyMessageCount = await prisma.messageLog.count({
+      where: { userId: req.user.id, sentAt: { gte: startOfMonth } }
+    });
+
+    if (limits.messages !== 999999 && monthlyMessageCount + totalRecipients > limits.messages) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Monthly message limit reached. Your ${user?.subscription?.plan || 'current'} plan allows ${limits.messages.toLocaleString()} messages per month. Please upgrade your plan.` 
       });
     }
 

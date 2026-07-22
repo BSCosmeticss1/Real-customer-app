@@ -1,9 +1,11 @@
 "use client";
 
-import { Bold, Italic, Link as LinkIcon, Send, Users, X, Check, Mail, Plus } from "lucide-react";
+import { Bold, Italic, Link as LinkIcon, Send, Users, X, Check, Mail, Plus, Upload } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -14,6 +16,9 @@ export default function EmailPage() {
   const [emails, setEmails] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [showContactSelector, setShowContactSelector] = useState(false);
+  const [parsedFileEmails, setParsedFileEmails] = useState<string[]>([]);
+  const [fileName, setFileName] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
 
@@ -91,6 +96,79 @@ export default function EmailPage() {
     setEmails((prev) => prev.filter((e) => e !== addr));
   };
 
+  const extractEmail = (str: string): string | null => {
+    if (!str) return null;
+    const match = String(str).match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    return match ? match[0] : null;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validExtensions = [".csv", ".xlsx", ".xls"];
+    const fileExtension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+
+    if (!validExtensions.includes(fileExtension)) {
+      toast.error("Invalid file format. Please upload CSV or Excel files.");
+      return;
+    }
+
+    setFileName(file.name);
+    const allEmails: string[] = [];
+
+    try {
+      if (fileExtension === ".csv") {
+        const text = await file.text();
+        Papa.parse(text, {
+          skipEmptyLines: true,
+          complete: (results) => {
+            const emailsFromCsv: string[] = [];
+            results.data.forEach((row: any) => {
+              Object.values(row).forEach((val: any) => {
+                const email = extractEmail(String(val));
+                if (email) emailsFromCsv.push(email);
+              });
+            });
+            setParsedFileEmails(emailsFromCsv);
+          },
+        });
+      } else {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+        const emailsFromExcel: string[] = [];
+        jsonData.forEach((row) => {
+          Object.values(row).forEach((val) => {
+            const email = extractEmail(String(val));
+            if (email) emailsFromExcel.push(email);
+          });
+        });
+        setParsedFileEmails(emailsFromExcel);
+      }
+    } catch (err) {
+      toast.error("Failed to parse file. Please check the format.");
+      setParsedFileEmails([]);
+    }
+  };
+
+  const addParsedEmails = () => {
+    const unique = Array.from(new Set(parsedFileEmails));
+    setEmails((prev) => Array.from(new Set([...prev, ...unique])));
+    setParsedFileEmails([]);
+    setFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    toast.success(`Added ${unique.length} email(s) to the list`);
+  };
+
+  const clearParsedEmails = () => {
+    setParsedFileEmails([]);
+    setFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const toggleContact = (id: string) => {
     setEmailContactIds((prev) =>
       prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
@@ -159,6 +237,61 @@ export default function EmailPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bulk Email Upload */}
+        <div className="mt-8">
+          <div className="label-eyebrow mb-3">Bulk Email Upload (CSV / Excel)</div>
+          <div className="border-2 border-dashed border-border rounded-xl p-6 text-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="csv-upload"
+            />
+            <label htmlFor="csv-upload" className="cursor-pointer flex flex-col items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+                <Upload className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {fileName ? fileName : "Click to upload or drag and drop"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">CSV, XLSX or XLS files accepted</p>
+              </div>
+            </label>
+          </div>
+
+          {parsedFileEmails.length > 0 && (
+            <div className="mt-4 bg-secondary/50 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium">Parsed Emails ({parsedFileEmails.length})</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={clearParsedEmails}
+                    className="text-xs text-muted-foreground hover:text-destructive font-medium"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={addParsedEmails}
+                    className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-medium hover:bg-primary-glow transition"
+                  >
+                    Add All to Recipients
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto">
+                {parsedFileEmails.map((addr) => (
+                  <span key={addr} className="text-xs bg-secondary px-2 py-1 rounded-md text-foreground">
+                    {addr}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>

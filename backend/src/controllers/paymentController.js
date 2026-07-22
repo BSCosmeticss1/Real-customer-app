@@ -59,12 +59,12 @@ exports.initializePaystack = async (req, res, next) => {
 // @route POST /payments/paystack/initialize-subscription
 exports.initializeSubscription = async (req, res, next) => {
   try {
-    const { planType, selectedFeatures, amount } = req.body; // 'monthly' or 'yearly', selected features, and total amount
-    if (!planType || !['monthly', 'yearly'].includes(planType)) {
-      return res.status(400).json({ success: false, message: 'Valid planType (monthly or yearly) is required' });
+    const { planType, interval, amount } = req.body;
+    if (!planType || !['standard', 'premium', 'enterprise'].includes(planType)) {
+      return res.status(400).json({ success: false, message: 'Valid planType (standard, premium, or enterprise) is required' });
     }
-    if (!selectedFeatures || !Array.isArray(selectedFeatures) || selectedFeatures.length === 0) {
-      return res.status(400).json({ success: false, message: 'At least one feature must be selected' });
+    if (!interval || !['monthly', 'yearly'].includes(interval)) {
+      return res.status(400).json({ success: false, message: 'Valid interval (monthly or yearly) is required' });
     }
     if (!amount || typeof amount !== 'number') {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
@@ -91,7 +91,7 @@ exports.initializeSubscription = async (req, res, next) => {
         metadata: { 
           userId: req.user.id, 
           planType, 
-          selectedFeatures,
+          interval,
           isSubscription: true 
         },
       },
@@ -106,8 +106,8 @@ exports.initializeSubscription = async (req, res, next) => {
         currency: 'NGN',
         method: 'paystack',
         status: 'pending',
-        description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} Subscription - ${selectedFeatures.length} features`,
-        metadata: { planType, selectedFeatures, isSubscription: true },
+        description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} ${interval} Subscription`,
+        metadata: { planType, interval, isSubscription: true },
       },
     });
 
@@ -154,21 +154,39 @@ exports.verifyPaystack = async (req, res, next) => {
     // Handle subscription completion
     if (txData.metadata?.isSubscription && txData.status === 'success') {
       const expiresAt = new Date();
-      if (txData.metadata.planType === 'monthly') {
+      const planType = txData.metadata.planType;
+      const interval = txData.metadata.interval || 'monthly';
+      
+      if (interval === 'monthly') {
         expiresAt.setMonth(expiresAt.getMonth() + 1);
       } else {
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       }
+
+      const planFeatures = {
+        standard: ["messaging", "contacts", "book-keeping", "sales-reporting", "email"],
+        premium: [
+          "messaging", "sms", "email", "automation",
+          "contacts", "inventory",
+          "book-keeping", "sales-reporting", "analytics"
+        ],
+        enterprise: [
+          "messaging", "sms", "email", "automation",
+          "contacts", "inventory",
+          "book-keeping", "sales-reporting", "analytics"
+        ],
+      };
 
       await prisma.user.update({
         where: { id: txData.metadata.userId },
         data: {
           subscription: {
             status: 'active',
-            plan: txData.metadata.planType,
+            plan: planType,
+            interval: interval,
             expiresAt: expiresAt.toISOString(),
             paystackCustomerCode: txData.customer.customer_code,
-            selectedFeatures: txData.metadata.selectedFeatures || [],
+            selectedFeatures: (planFeatures[planType] || planFeatures.premium),
           },
           onboardingStatus: 'COMPLETED',
         },

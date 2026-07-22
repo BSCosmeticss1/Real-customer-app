@@ -3,64 +3,46 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Building2, Phone, Globe, MapPin, Check, ShieldCheck, Zap, MessageSquare, BarChart3, Calendar, CreditCard, Users, Package } from "lucide-react";
+import { ArrowRight, Building2, Phone, Globe, MapPin, Check, Shield, Zap, Crown } from "lucide-react";
 
-const FEATURE_MODULES = [
+const PLANS = [
   {
-    id: "messaging",
-    name: "Messaging",
-    description: "Manage messaging across WhatsApp, Instagram, Facebook",
-    icon: MessageSquare,
-    monthlyPrice: 10000,
-    yearlyPrice: 80000,
+    id: "standard",
+    name: "Standard",
+    description: "Essential tools for small teams getting started",
+    icon: Shield,
+    monthlyPrice: 25000,
+    yearlyPrice: 240000,
+    features: ["Messaging", "Contacts", "Book Keeping", "Sales Reporting", "Email"],
+    limits: { users: 3, contacts: 1000, messages: 5000 }
   },
   {
-    id: "contacts",
-    name: "Contacts",
-    description: "Manage your customer contacts and segments",
-    icon: Users,
-    monthlyPrice: 8000,
-    yearlyPrice: 64000,
-  },
-  {
-    id: "inventory",
-    name: "Inventory",
-    description: "Product and inventory management",
-    icon: Package,
-    monthlyPrice: 9000,
-    yearlyPrice: 72000,
-  },
-  {
-    id: "analytics",
-    name: "Analytics",
-    description: "Detailed reports and insights for your business",
-    icon: BarChart3,
-    monthlyPrice: 8000,
-    yearlyPrice: 64000,
-  },
-  {
-    id: "automation",
-    name: "Automation",
-    description: "Scheduled messages and automated workflows",
+    id: "premium",
+    name: "Premium",
+    description: "Complete access for growing businesses",
     icon: Zap,
-    monthlyPrice: 12000,
-    yearlyPrice: 96000,
+    monthlyPrice: 50000,
+    yearlyPrice: 480000,
+    features: [
+      "Messaging", "SMS", "Email", "Automation",
+      "Contacts", "Inventory",
+      "Book Keeping", "Sales Reporting", "Analytics"
+    ],
+    limits: { users: 10, contacts: 10000, messages: 50000 }
   },
   {
-    id: "bookingReporting",
-    name: "Booking & Reporting",
-    description: "Appointment scheduling and comprehensive reporting",
-    icon: Calendar,
-    monthlyPrice: 9000,
-    yearlyPrice: 72000,
-  },
-  {
-    id: "finance",
-    name: "Finance",
-    description: "Invoices, expenses, and financial management",
-    icon: CreditCard,
-    monthlyPrice: 11000,
-    yearlyPrice: 88000,
+    id: "enterprise",
+    name: "Enterprise",
+    description: "Advanced features and dedicated support",
+    icon: Crown,
+    monthlyPrice: 100000,
+    yearlyPrice: 960000,
+    features: [
+      "Messaging", "SMS", "Email", "Automation",
+      "Contacts", "Inventory",
+      "Book Keeping", "Sales Reporting", "Analytics"
+    ],
+    limits: { users: 999, contacts: 99999, messages: 999999 }
   },
 ];
 
@@ -70,9 +52,8 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
-  
-  // Step 1 data
+  const [selectedPlan, setSelectedPlan] = useState<string>("premium");
+
   const [businessData, setBusinessData] = useState({
     businessName: "",
     businessPhone: "",
@@ -82,24 +63,14 @@ export default function Onboarding() {
     timezone: "Africa/Lagos",
   });
 
-  const toggleFeature = (featureId: string) => {
-    setSelectedFeatures(prev => 
-      prev.includes(featureId) 
-        ? prev.filter(id => id !== featureId) 
-        : [...prev, featureId]
-    );
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
   };
 
   const calculateTotal = () => {
-    return selectedFeatures.reduce((total, id) => {
-      const feature = FEATURE_MODULES.find(f => f.id === id);
-      if (!feature) return total;
-      return total + (billingCycle === "monthly" ? feature.monthlyPrice : feature.yearlyPrice);
-    }, 0);
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
+    const plan = PLANS.find(p => p.id === selectedPlan);
+    if (!plan) return 0;
+    return billingCycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
   };
 
   const handleDetailsSubmit = async (e: FormEvent) => {
@@ -132,10 +103,6 @@ export default function Onboarding() {
   };
 
   const handlePlanSelection = async () => {
-    if (selectedFeatures.length === 0) {
-      setError("Please select at least one feature");
-      return;
-    }
     setLoading(true);
     setError("");
 
@@ -148,8 +115,8 @@ export default function Onboarding() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ 
-          planType: billingCycle,
-          selectedFeatures,
+          planType: selectedPlan,
+          interval: billingCycle,
           amount: calculateTotal()
         }),
       });
@@ -176,7 +143,6 @@ export default function Onboarding() {
           <div className="flex items-center gap-4">
             <div className={`h-2 w-12 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-muted'}`} />
             <div className={`h-2 w-12 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />
-            <div className={`h-2 w-12 rounded-full ${step >= 3 ? 'bg-primary' : 'bg-muted'}`} />
           </div>
         </div>
       </header>
@@ -186,7 +152,7 @@ export default function Onboarding() {
           {step === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="text-center">
-                <div className="label-eyebrow">Step 2 of 3</div>
+                <div className="label-eyebrow">Step 1 of 2</div>
                 <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2">Business details</h1>
                 <p className="text-muted-foreground mt-2 text-sm sm:text-base">Tell us more about your organization.</p>
               </div>
@@ -232,7 +198,7 @@ export default function Onboarding() {
                   type="submit" 
                   className="w-full bg-primary text-primary-foreground rounded-xl py-4 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition"
                 >
-                  {loading ? "Saving..." : "Continue to Pricing"} <ArrowRight className="h-4 w-4" />
+                  {loading ? "Saving..." : "Continue to Plans"} <ArrowRight className="h-4 w-4" />
                 </button>
               </form>
             </div>
@@ -241,9 +207,9 @@ export default function Onboarding() {
           {step === 2 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 py-4">
               <div className="text-center">
-                <div className="label-eyebrow">Step 3 of 3</div>
-                <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2">Choose your features</h1>
-                <p className="text-muted-foreground mt-2 text-sm sm:text-base">Select the modules you need and pay only for what you use.</p>
+                <div className="label-eyebrow">Step 2 of 2</div>
+                <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2">Choose your plan</h1>
+                <p className="text-muted-foreground mt-2 text-sm sm:text-base">Select the plan that fits your business needs.</p>
               </div>
 
               {/* Billing cycle toggle */}
@@ -259,62 +225,74 @@ export default function Onboarding() {
                     onClick={() => setBillingCycle("yearly")}
                     className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${billingCycle === "yearly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
                   >
-                    Yearly <span className="text-xs opacity-75">Save more</span>
+                    Yearly <span className="text-xs opacity-75">Save 20%</span>
                   </button>
                 </div>
               </div>
 
-              {/* Feature modules grid */}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {FEATURE_MODULES.map((feature) => (
-                  <FeatureCard
-                    key={feature.id}
-                    feature={feature}
-                    selected={selectedFeatures.includes(feature.id)}
-                    onClick={() => toggleFeature(feature.id)}
-                    billingCycle={billingCycle}
-                    formatPrice={formatPrice}
-                  />
-                ))}
-              </div>
+              {/* Plan cards */}
+              <div className="grid sm:grid-cols-3 gap-6">
+                {PLANS.map((plan) => {
+                  const Icon = plan.icon;
+                  const isSelected = selectedPlan === plan.id;
+                  const price = billingCycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
 
-              {/* Summary card */}
-              {selectedFeatures.length > 0 && (
-                <div className="bg-card border border-border rounded-3xl p-6 shadow-deep">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg">Your Plan</h3>
-                      <p className="text-muted-foreground text-sm">{selectedFeatures.length} feature{selectedFeatures.length !== 1 ? 's' : ''} selected</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold">{formatPrice(calculateTotal())}</div>
-                      <div className="text-muted-foreground text-sm">/{billingCycle === "monthly" ? "month" : "year"}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Selected features list */}
-                  <div className="mt-4 space-y-2">
-                    {selectedFeatures.map(id => {
-                      const feature = FEATURE_MODULES.find(f => f.id === id);
-                      return (
-                        <div key={id} className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2">
-                            <Check className="h-4 w-4 text-primary" />
-                            {feature?.name}
-                          </span>
-                          <span className="text-muted-foreground">{formatPrice(billingCycle === "monthly" ? feature!.monthlyPrice : feature!.yearlyPrice)}</span>
+                  return (
+                    <div
+                      key={plan.id}
+                      onClick={() => setSelectedPlan(plan.id)}
+                      className={`relative cursor-pointer bg-card border-2 rounded-3xl p-6 transition-all duration-300 flex flex-col h-full ${isSelected ? 'border-primary shadow-deep scale-[1.02]' : 'border-border hover:border-primary/50'}`}
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                          <Icon className="h-6 w-6" />
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                        <div>
+                          <h3 className="font-semibold text-lg">{plan.name}</h3>
+                          <p className="text-xs text-muted-foreground">{plan.description}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-6">
+                        <div className="text-3xl font-bold">{formatPrice(price)}</div>
+                        <div className="text-xs text-muted-foreground">/{billingCycle === 'monthly' ? 'month' : 'year'}</div>
+                      </div>
+
+                      <div className="space-y-3 mb-6 flex-1">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Features</div>
+                        {plan.features.map((feature) => (
+                          <div key={feature} className="flex items-center gap-2 text-sm">
+                            <Check className="h-4 w-4 text-success" />
+                            <span className="text-foreground">{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="space-y-2 pt-4 border-t border-border">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Limits</div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Users</span>
+                          <span className="font-medium">{plan.limits.users === 999 ? 'Unlimited' : plan.limits.users}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Contacts</span>
+                          <span className="font-medium">{plan.limits.contacts === 99999 ? 'Unlimited' : plan.limits.contacts.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Messages/mo</span>
+                          <span className="font-medium">{plan.limits.messages === 999999 ? 'Unlimited' : plan.limits.messages.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               {error && <p className="text-destructive text-sm text-center">{error}</p>}
 
               <div className="flex flex-col gap-4">
                 <button 
-                  disabled={loading || selectedFeatures.length === 0}
+                  disabled={loading}
                   onClick={handlePlanSelection}
                   className="w-full bg-primary text-primary-foreground rounded-xl py-4 font-semibold flex items-center justify-center gap-2 shadow-deep hover:bg-primary-glow transition disabled:opacity-50"
                 >
@@ -344,30 +322,5 @@ function Field({ icon: Icon, label, ...props }: { icon: any; label: string } & R
         <input {...props} className="w-full bg-card border border-border rounded-xl pl-11 pr-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20" />
       </div>
     </label>
-  );
-}
-
-function FeatureCard({ feature, selected, onClick, billingCycle, formatPrice }: any) {
-  const Icon = feature.icon;
-  return (
-    <div 
-      onClick={onClick}
-      className={`relative cursor-pointer bg-card border-2 rounded-2xl p-5 transition-all duration-300 flex flex-col h-full ${selected ? 'border-primary shadow-deep' : 'border-border hover:border-primary/50'}`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${selected ? 'border-primary bg-primary' : 'border-muted-foreground'}`}>
-          {selected && <Check className="h-3 w-3 text-primary-foreground" />}
-        </div>
-      </div>
-      <h3 className="font-semibold text-base mb-1">{feature.name}</h3>
-      <p className="text-sm text-muted-foreground mb-4">{feature.description}</p>
-      <div className="mt-auto">
-        <div className="text-xl font-bold">{formatPrice(billingCycle === "monthly" ? feature.monthlyPrice : feature.yearlyPrice)}</div>
-        <div className="text-xs text-muted-foreground">/{billingCycle === "monthly" ? "month" : "year"}</div>
-      </div>
-    </div>
   );
 }

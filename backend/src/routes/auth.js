@@ -3,7 +3,7 @@ const router  = express.Router();
 const {
   register, login, getMe, updateProfile, changePassword,
   forgotPassword, verifyOTP, resetPassword, resendOTP, updateApiKeys,
-  verifyEmail, resendVerificationOTP, firstTimePasswordChange
+  verifyEmail, resendVerificationOTP, firstTimePasswordChange, getPlanUsage
 } = require('../controllers/authController');
 const { protect, adminOnly } = require('../middleware/auth');
 
@@ -20,6 +20,7 @@ router.post('/resend-verification', resendVerificationOTP);
 // ── Protected ─────────────────────────────────────────────────────────────────
 router.use(protect);
 router.get('/me',                   getMe);
+router.get('/plan-usage',           getPlanUsage);
 router.put('/profile',              updateProfile);
 router.put('/change-password',      changePassword);
 router.put('/first-password-change', firstTimePasswordChange);

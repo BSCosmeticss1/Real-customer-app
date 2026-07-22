@@ -2,6 +2,7 @@ const { prisma } = require('../config/db');
 const { paginateResult } = require('../middleware/paginate');
 const csv = require('csv-parser');
 const fs = require('fs');
+const { getPlanLimits } = require('./userController');
 
 // @route GET /contacts
 exports.getContacts = async (req, res, next) => {
@@ -53,6 +54,20 @@ exports.getContact = async (req, res, next) => {
 // @route POST /contacts
 exports.createContact = async (req, res, next) => {
   try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true }
+    });
+    const limits = getPlanLimits(user);
+    const contactCount = await prisma.contact.count({ where: { userId: req.user.id } });
+    
+    if (limits.contacts !== 99999 && contactCount >= limits.contacts) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Contact limit reached. Your ${user?.subscription?.plan || 'current'} plan allows up to ${limits.contacts.toLocaleString()} contacts. Please upgrade your plan to add more contacts.` 
+      });
+    }
+
     const contact = await prisma.contact.create({
       data: { ...req.body, userId: req.user.id },
     });
@@ -91,8 +106,13 @@ exports.importContacts = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
-    const contacts = [];
-    const errors = [];
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { subscription: true }
+    });
+    const limits = getPlanLimits(user);
+    const contactCount = await prisma.contact.count({ where: { userId: req.user.id } });
+    const newContacts = [];
 
     await new Promise((resolve, reject) => {
       fs.createReadStream(req.file.path)
@@ -112,16 +132,22 @@ exports.importContacts = async (req, res, next) => {
             tags: row.tags ? row.tags.split(',').map(t => t.trim()) : [],
             source: 'import',
           };
-          if (contact.name) contacts.push(contact);
-          else errors.push(row);
+          if (contact.name) newContacts.push(contact);
         })
         .on('end', resolve)
         .on('error', reject);
     });
 
+    if (limits.contacts !== 99999 && contactCount + newContacts.length > limits.contacts) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Contact limit would be exceeded. Your ${user?.subscription?.plan || 'current'} plan allows up to ${limits.contacts.toLocaleString()} contacts. You currently have ${contactCount.toLocaleString()} contacts and are trying to import ${newContacts.length} more. Please upgrade your plan.` 
+      });
+    }
+
     // Upsert contacts
     let imported = 0;
-    for (const c of contacts) {
+    for (const c of newContacts) {
       // Find existing contact by phone, email, or name
       const existing = await prisma.contact.findFirst({
         where: {
@@ -150,7 +176,7 @@ exports.importContacts = async (req, res, next) => {
     // Clean up temp file
     fs.unlinkSync(req.file.path);
 
-    res.json({ success: true, data: { imported, errors: errors.length } });
+    res.json({ success: true, data: { imported, errors: 0 } });
   } catch (err) {
     if (req.file?.path) fs.unlinkSync(req.file.path);
     next(err);
