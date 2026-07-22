@@ -5,7 +5,7 @@ import { Check, Loader2, ArrowRight, Shield, Zap, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export const ALL_FEATURES = [
+const ALL_FEATURES = [
   { id: "messaging", name: "Messaging", description: "WhatsApp, Instagram, Facebook" },
   { id: "sms", name: "SMS", description: "Bulk SMS messaging" },
   { id: "email", name: "Email", description: "Email campaigns" },
@@ -23,7 +23,7 @@ export const PLAN_MODULES = {
   enterprise: ALL_FEATURES.map(f => f.id),
 };
 
-export const PLANS = [
+const PLANS = [
   {
     id: "standard",
     name: "Standard",
