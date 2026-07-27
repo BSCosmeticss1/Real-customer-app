@@ -14,8 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { useState, useEffect, useCallback } from "react";
 
 interface Product {
   id: string;
@@ -61,13 +61,12 @@ export default function InventoryPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
-  const { toast } = useToast();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   const getToken = () => localStorage.getItem("token");
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -79,17 +78,17 @@ export default function InventoryPage() {
       if (data.success) {
         setProducts(data.data);
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast.error("Error");
       }
     } catch (err) {
       console.error("Failed to fetch products:", err);
-      toast({ title: "Error", description: "Failed to load inventory", variant: "destructive" });
+      toast.error("Failed to load inventory");
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedUserId, API_URL]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/inventory/users`, {
         headers: { "Authorization": `Bearer ${getToken()}` }
@@ -101,15 +100,15 @@ export default function InventoryPage() {
     } catch (err) {
       console.error("Failed to fetch users:", err);
     }
-  };
+  }, [API_URL]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   useEffect(() => {
     fetchProducts();
-  }, [selectedUserId]);
+  }, [fetchProducts, selectedUserId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,17 +131,17 @@ export default function InventoryPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: "Success", description: editingId ? "Product updated successfully" : "Product added successfully" });
+        toast.success(editingId ? "Product updated successfully" : "Product added successfully");
         setDialogOpen(false);
         setEditingId(null);
         setFormData(emptyForm);
         fetchProducts();
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast.error("Error");
       }
     } catch (err) {
       console.error("Failed to save product:", err);
-      toast({ title: "Error", description: "Failed to save product", variant: "destructive" });
+      toast.error("Failed to save product");
     }
   };
 
@@ -155,15 +154,15 @@ export default function InventoryPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: "Success", description: "Product removed successfully" });
+        toast.success("Product removed successfully");
         setDeleteTargetId(null);
         fetchProducts();
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast.error("Error");
       }
     } catch (err) {
       console.error("Failed to delete product:", err);
-      toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
+      toast.error("Failed to delete product");
     }
   };
 
@@ -182,13 +181,13 @@ export default function InventoryPage() {
         a.download = 'inventory.csv';
         a.click();
         window.URL.revokeObjectURL(url);
-        toast({ title: "Success", description: "Inventory exported successfully" });
+        toast.success("Inventory exported successfully");
       } else {
-        toast({ title: "Error", description: "Failed to export inventory", variant: "destructive" });
+        toast.error("Failed to export inventory");
       }
     } catch (err) {
       console.error("Failed to export products:", err);
-      toast({ title: "Error", description: "Failed to export inventory", variant: "destructive" });
+      toast.error("Failed to export inventory");
     }
   };
 

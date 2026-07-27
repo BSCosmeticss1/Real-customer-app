@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function VerifyPayment() {
+function VerifyPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference");
@@ -79,14 +80,14 @@ export default function VerifyPayment() {
             <h1 className="font-display text-2xl font-semibold mb-2">Payment Failed</h1>
             <p className="text-muted-foreground mb-8">{message}</p>
             <div className="flex flex-col w-full gap-3">
-              <button 
+              <button
                 onClick={() => router.push("/onboarding")}
                 className="w-full bg-primary text-primary-foreground rounded-xl py-3.5 font-semibold shadow-deep hover:bg-primary-glow transition"
               >
                 Try again
               </button>
-              <Link 
-                href="/app" 
+              <Link
+                href="/app"
                 className="text-sm text-muted-foreground hover:text-foreground transition"
               >
                 Go to app anyway (Restricted access)
@@ -95,7 +96,7 @@ export default function VerifyPayment() {
           </div>
         )}
       </div>
-      
+
       <style jsx>{`
         @keyframes progress {
           from { width: 0%; }
@@ -106,5 +107,13 @@ export default function VerifyPayment() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function VerifyPayment() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center"><Loader2 className="h-12 w-12 text-primary animate-spin" /></div>}>
+      <VerifyPaymentContent />
+    </Suspense>
   );
 }

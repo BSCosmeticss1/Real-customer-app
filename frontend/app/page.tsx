@@ -10,9 +10,7 @@ export default function Landing() {
       <header className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
         <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
-          <a className="text-primary border-b-2 border-primary pb-1">Solutions</a>
-          <a className="text-muted-foreground">How it works</a>
-          <a className="text-muted-foreground">Enterprise</a>
+          <a href="/how-it-works" className="text-primary border-b-2 border-primary pb-1">How it works</a>
         </nav>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-sm font-semibold">Login</Link>
@@ -67,7 +65,7 @@ export default function Landing() {
           <div className="bg-card rounded-2xl p-7 shadow-card md:col-span-1">
             <MessageCircle className="h-7 w-7 text-success" />
             <h3 className="font-display text-2xl font-semibold mt-4">WhatsApp Business</h3>
-            <p className="text-muted-foreground text-sm mt-2">Deploy automated workflows on the world's most popular messaging app with enterprise-grade security and full API support.</p>
+            <p className="text-muted-foreground text-sm mt-2">Deploy automated workflows on the world&apos;s most popular messaging app with enterprise-grade security and full API support.</p>
             <div className="mt-5 flex items-center gap-3">
               <div className="flex -space-x-2">
                 {["bg-primary","bg-accent","bg-success"].map((c,i) => <div key={i} className={`h-7 w-7 rounded-full border-2 border-card ${c}`} />)}

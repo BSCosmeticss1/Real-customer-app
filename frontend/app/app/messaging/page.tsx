@@ -168,7 +168,7 @@ export default function Messaging() {
             </div>
           ) : (
             <div className="bg-secondary/50 rounded-xl p-4 text-center text-muted-foreground">
-              No contacts selected. Click "Select Contacts" to choose who to message.
+              No contacts selected. Click &quot;Select Contacts&quot; to choose who to message.
             </div>
           )}
         </div>

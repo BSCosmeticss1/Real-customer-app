@@ -243,23 +243,24 @@ export default function Onboarding() {
                       onClick={() => setSelectedPlan(plan.id)}
                       className={`relative cursor-pointer bg-card border-2 rounded-3xl p-6 transition-all duration-300 flex flex-col h-full ${isSelected ? 'border-primary shadow-deep scale-[1.02]' : 'border-border hover:border-primary/50'}`}
                     >
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">{plan.name}</h3>
-                          <p className="text-xs text-muted-foreground">{plan.description}</p>
-                        </div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        <Icon className="h-6 w-6" />
                       </div>
-                      
-                      <div className="mb-6">
-                        <div className="text-3xl font-bold">{formatPrice(price)}</div>
-                        <div className="text-xs text-muted-foreground">/{billingCycle === 'monthly' ? 'month' : 'year'}</div>
+                      <div>
+                        <h3 className="font-semibold text-lg">{plan.name}</h3>
+                        <p className="text-xs text-muted-foreground">{plan.description}</p>
                       </div>
-
-                      <div className="space-y-3 mb-6 flex-1">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Features</div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <div className="text-3xl font-bold">{formatPrice(price)}</div>
+                      <div className="text-xs text-muted-foreground">/{billingCycle === 'monthly' ? 'month' : 'year'}</div>
+                    </div>
+  
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Features</div>
+                      <div className="space-y-2">
                         {plan.features.map((feature) => (
                           <div key={feature} className="flex items-center gap-2 text-sm">
                             <Check className="h-4 w-4 text-success" />
@@ -267,22 +268,7 @@ export default function Onboarding() {
                           </div>
                         ))}
                       </div>
-
-                      <div className="space-y-2 pt-4 border-t border-border">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Limits</div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Users</span>
-                          <span className="font-medium">{plan.limits.users === 999 ? 'Unlimited' : plan.limits.users}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Contacts</span>
-                          <span className="font-medium">{plan.limits.contacts === 99999 ? 'Unlimited' : plan.limits.contacts.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Messages/mo</span>
-                          <span className="font-medium">{plan.limits.messages === 999999 ? 'Unlimited' : plan.limits.messages.toLocaleString()}</span>
-                        </div>
-                      </div>
+                    </div>
                     </div>
                   );
                 })}

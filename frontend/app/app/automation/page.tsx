@@ -209,7 +209,7 @@ export default function AutomationPage() {
             <CardContent className="p-8 text-center text-muted-foreground">
               <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
               <p className="text-lg font-medium">No scheduled messages yet</p>
-              <p className="text-sm mt-1">Click "New Schedule" to create your first automated message.</p>
+              <p className="text-sm mt-1">Click &quot;New Schedule&quot; to create your first automated message.</p>
             </CardContent>
           </Card>
         ) : (

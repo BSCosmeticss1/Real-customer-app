@@ -3,9 +3,10 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Mail, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Mail, CheckCircle2, Loader2 } from "lucide-react";
+import { Suspense } from "react";
 
-export default function VerifyEmail() {
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email");
@@ -80,7 +81,7 @@ export default function VerifyEmail() {
         <div>
           <h2 className="font-display text-5xl font-semibold mt-4 leading-[1.05]">Verify your<br />identity.</h2>
           <p className="text-primary-foreground/75 mt-6 max-w-sm leading-relaxed">
-            We've sent a 6-digit code to <strong>{email}</strong>. Enter it below to continue setting up your organization.
+            We&apos;ve sent a 6-digit code to <strong>{email}</strong>. Enter it below to continue setting up your organization.
           </p>
         </div>
       </div>
@@ -126,12 +127,20 @@ export default function VerifyEmail() {
                 onClick={resendOtp}
                 className="text-sm text-primary font-semibold hover:underline"
               >
-                Didn't receive a code? Resend
+                Didn&apos;t receive a code? Resend
               </button>
             </div>
           </form>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmail() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center"><Loader2 className="h-12 w-12 text-primary animate-spin" /></div>}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

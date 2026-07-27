@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-export const SUB_MODULES = [
+const SUB_MODULES = [
   { id: "messaging", name: "Messaging", path: "/app/messaging", icon: MessageSquare, group: "Communication" },
   { id: "sms", name: "SMS", path: "/app/sms", icon: Phone, group: "Communication" },
   { id: "email", name: "Email", path: "/app/email", icon: Mail, group: "Communication" },
@@ -20,7 +20,7 @@ export const SUB_MODULES = [
   { id: "analytics", name: "Analytics", path: "/app/analytics", icon: LineChart, group: "Reports" },
 ];
 
-export const PLAN_MODULES = {
+const PLAN_MODULES = {
   standard: ["messaging", "contacts", "book-keeping", "sales-reporting"],
   premium: SUB_MODULES.map(m => m.id),
   enterprise: SUB_MODULES.map(m => m.id),
@@ -351,19 +351,19 @@ export default function Team() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Team Members</span>
               <span className={`font-medium ${planUsage.usage.users >= planUsage.limits.users ? 'text-destructive' : ''}`}>
-                {planUsage.usage.users} / {planUsage.limits.users === 999 ? '∞' : planUsage.limits.users}
+                {planUsage.usage.users} / {planUsage.limits.users === 999 ? 'Unlimited' : planUsage.limits.users}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Contacts</span>
               <span className={`font-medium ${planUsage.usage.contacts >= planUsage.limits.contacts ? 'text-destructive' : ''}`}>
-                {planUsage.usage.contacts.toLocaleString()} / {planUsage.limits.contacts === 99999 ? '∞' : planUsage.limits.contacts.toLocaleString()}
+                {planUsage.usage.contacts.toLocaleString()} / {planUsage.limits.contacts === 99999 ? 'Unlimited' : planUsage.limits.contacts.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Messages/mo</span>
               <span className={`font-medium ${planUsage.usage.messages >= planUsage.limits.messages ? 'text-destructive' : ''}`}>
-                {planUsage.usage.messages.toLocaleString()} / {planUsage.limits.messages === 999999 ? '∞' : planUsage.limits.messages.toLocaleString()}
+                {planUsage.usage.messages.toLocaleString()} / {planUsage.limits.messages === 999999 ? 'Unlimited' : planUsage.limits.messages.toLocaleString()}
               </span>
             </div>
           </div>

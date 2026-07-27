@@ -129,7 +129,7 @@ export default function ForgotPassword() {
           {step === 1 && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h1 className="font-display text-3xl sm:text-4xl font-semibold text-foreground">Forgot password?</h1>
-              <p className="text-muted-foreground mt-2">No worries, we'll send you reset instructions.</p>
+              <p className="text-muted-foreground mt-2">No worries, we&apos;ll send you reset instructions.</p>
               <form onSubmit={handleSendOTP} className="mt-8 space-y-5">
                 <Field 
                   icon={Mail} 

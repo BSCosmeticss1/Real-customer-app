@@ -229,7 +229,7 @@ export default function Contacts() {
             ) : contacts.length === 0 ? (
               <tr>
                 <td colSpan={platforms.length + 3} className="p-8 text-center text-muted-foreground">
-                  No contacts found. Click "Add Contact" to get started!
+                  No contacts found. Click &quot;Add Contact&quot; to get started!
                 </td>
               </tr>
             ) : (

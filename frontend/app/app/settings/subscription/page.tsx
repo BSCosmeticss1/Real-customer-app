@@ -17,7 +17,7 @@ const ALL_FEATURES = [
   { id: "analytics", name: "Analytics", description: "Insights & charts" },
 ];
 
-export const PLAN_MODULES = {
+const PLAN_MODULES = {
   standard: ["messaging", "contacts", "book-keeping", "sales-reporting", "email"],
   premium: ALL_FEATURES.map(f => f.id),
   enterprise: ALL_FEATURES.map(f => f.id),
@@ -228,38 +228,24 @@ export default function SubscriptionSettings() {
                 </div>
               </div>
               
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="text-3xl font-bold">{formatPrice(price)}</div>
                 <div className="text-xs text-muted-foreground">/{billingCycle === 'monthly' ? 'month' : 'year'}</div>
               </div>
 
-              <div className="space-y-3 mb-6 flex-1">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Features</div>
-                {plan.features.map((featureId) => {
-                  const feature = ALL_FEATURES.find(f => f.id === featureId);
-                  if (!feature) return null;
-                  return (
-                    <div key={featureId} className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-success" />
-                      <span className="text-foreground">{feature.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="space-y-2 pt-4 border-t border-border">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Limits</div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Users</span>
-                  <span className="font-medium">{plan.limits.users === 999 ? 'Unlimited' : plan.limits.users}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Contacts</span>
-                  <span className="font-medium">{plan.limits.contacts === 99999 ? 'Unlimited' : plan.limits.contacts.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Messages/mo</span>
-                  <span className="font-medium">{plan.limits.messages === 999999 ? 'Unlimited' : plan.limits.messages.toLocaleString()}</span>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Features</div>
+                <div className="space-y-2">
+                  {ALL_FEATURES.map((feature) => {
+                    const isIncluded = plan.features.includes(feature.id);
+                    if (!isIncluded) return null;
+                    return (
+                      <div key={feature.id} className="flex items-center gap-2 text-sm">
+                        <Check className="h-4 w-4 text-success" />
+                        <span className="text-foreground">{feature.name}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -292,7 +278,7 @@ export default function SubscriptionSettings() {
             </>
           ) : (
             <>
-              {isCurrentPlan ? "Keep Current Plan" : "Update Subscription"}
+              {(user?.subscription?.plan === selectedPlan) ? "Keep Current Plan" : "Update Subscription"}
               <ArrowRight className="h-5 w-5" />
             </>
           )}
