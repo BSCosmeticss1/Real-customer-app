@@ -77,7 +77,7 @@ function VerifyEmailContent() {
   return (
     <div className="h-screen grid lg:grid-cols-2 bg-background overflow-hidden">
       <div className="hidden lg:flex flex-col justify-between p-12 text-primary-foreground relative overflow-hidden" style={{ background: "var(--gradient-deep)" }}>
-        <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
+        <Link href="/" className="font-display text-xl font-semibold">My Real Customer App</Link>
         <div>
           <h2 className="font-display text-5xl font-semibold mt-4 leading-[1.05]">Verify your<br />identity.</h2>
           <p className="text-primary-foreground/75 mt-6 max-w-sm leading-relaxed">
@@ -89,7 +89,7 @@ function VerifyEmailContent() {
       <div className="flex flex-col px-8 sm:px-16 py-6 overflow-y-auto">
         <div className="max-w-md w-full mx-auto my-auto py-8">
           <div className="lg:hidden mb-6">
-            <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
+            <Link href="/" className="font-display text-xl font-semibold">My Real Customer App</Link>
           </div>
           <div className="label-eyebrow">Step 1 of 3</div>
           <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2 text-foreground">Check your email</h1>

@@ -55,7 +55,7 @@ export default function Login() {
   return (
     <div className="h-screen grid lg:grid-cols-2 bg-background overflow-hidden">
       <div className="hidden lg:flex flex-col justify-between p-12 text-primary-foreground relative overflow-hidden" style={{ background: "var(--gradient-deep)" }}>
-        <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
+        <Link href="/" className="font-display text-xl font-semibold">My Real Customer App</Link>
         <div>
           <div className="label-eyebrow text-primary-foreground/70">Welcome back</div>
           <h2 className="font-display text-5xl font-semibold mt-4 leading-[1.05]">
@@ -69,7 +69,7 @@ export default function Login() {
       <div className="flex flex-col px-8 sm:px-16 py-6 overflow-y-auto">
         <div className="max-w-md w-full mx-auto my-auto py-8">
           <div className="lg:hidden mb-6">
-            <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
+            <Link href="/" className="font-display text-xl font-semibold">My Real Customer App</Link>
           </div>
           <div className="label-eyebrow">Sign in</div>
           <h1 className="font-display text-3xl sm:text-4xl font-semibold mt-2 text-foreground">Welcome back</h1>

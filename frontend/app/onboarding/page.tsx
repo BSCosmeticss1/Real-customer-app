@@ -139,7 +139,7 @@ export default function Onboarding() {
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50 shrink-0">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
+          <Link href="/" className="font-display text-xl font-semibold">My Real Customer App</Link>
           <div className="flex items-center gap-4">
             <div className={`h-2 w-12 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-muted'}`} />
             <div className={`h-2 w-12 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-muted'}`} />

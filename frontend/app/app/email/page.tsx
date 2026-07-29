@@ -202,7 +202,7 @@ export default function EmailPage() {
           </div>
           <div>
             <h1 className="font-display text-3xl font-semibold">Send Email</h1>
-            <p className="text-muted-foreground text-sm">Reach contacts or any external email addresses instantly via Real customer App.</p>
+            <p className="text-muted-foreground text-sm">Reach contacts or any external email addresses instantly via My Real Customer App.</p>
           </div>
         </div>
 

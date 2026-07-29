@@ -8,9 +8,11 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       {/* Nav */}
       <header className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
-        <Link href="/" className="font-display text-xl font-semibold">Real customer App</Link>
+        <Link href="/" className="font-display text-xl font-semibold">My Real Customer App</Link>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
           <a href="/how-it-works" className="text-primary border-b-2 border-primary pb-1">How it works</a>
+          <Link href="/enterprise" className="hover:text-primary transition">Enterprise</Link>
+          <Link href="/contact" className="hover:text-primary transition">Contact</Link>
         </nav>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-sm font-semibold">Login</Link>
@@ -21,7 +23,7 @@ export default function Landing() {
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-8 pt-12 pb-20 grid lg:grid-cols-2 gap-12 items-center">
         <div>
-          <div className="label-eyebrow">The Real customer App Framework</div>
+          <div className="label-eyebrow">The My Real Customer App Framework</div>
           <h1 className="font-display text-7xl font-semibold mt-4 leading-[0.95]">
             Precision <br />Messaging <br />
             <span className="text-muted-foreground">Engineered for</span> <br />Scale.
@@ -31,26 +33,16 @@ export default function Landing() {
           </p>
           <div className="flex gap-3 mt-8">
             <Link href="/app" className="bg-primary text-primary-foreground px-6 py-3.5 rounded-xl font-semibold flex items-center gap-2 shadow-deep">Start Building Now <ArrowRight className="h-4 w-4" /></Link>
-            <button className="bg-card px-6 py-3.5 rounded-xl font-semibold border border-border">Request Demo</button>
+            <Link href="/demo-request" className="bg-card px-6 py-3.5 rounded-xl font-semibold border border-border hover:border-primary transition">Request Demo</Link>
           </div>
         </div>
         <div className="relative">
-          <div className="bg-card rounded-3xl shadow-deep p-6 mx-auto max-w-sm">
-            <div className="space-y-3">
-              {[80,60,75,50].map((w,i) => (
-                <div key={i} className="space-y-1.5">
-                  <div className="h-2 rounded bg-secondary" style={{width: `${w}%`}} />
-                  <div className="h-2 rounded bg-secondary" style={{width: `${w-15}%`}} />
-                </div>
-              ))}
-              <div className="border-t border-border my-4" />
-              <div className="grid grid-cols-3 gap-2">
-                {[1,2,3].map(i => <div key={i} className="h-12 rounded-lg bg-secondary" />)}
-              </div>
-              <div className="space-y-1.5 pt-2">
-                {[70,55,65].map((w,i) => <div key={i} className="h-2 rounded bg-secondary" style={{width: `${w}%`}} />)}
-              </div>
-            </div>
+          <div className="bg-card rounded-3xl shadow-deep p-2 mx-auto max-w-sm overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=800&h=600&fit=crop&auto=format"
+              alt="Dashboard preview"
+              className="rounded-2xl w-full h-auto object-cover"
+            />
           </div>
         </div>
       </section>
@@ -134,14 +126,19 @@ export default function Landing() {
         </div>
         <div className="grid md:grid-cols-3 gap-5">
           {[
-            { step: "01", title: "Connect Your Channels", body: "Link WhatsApp Business, Instagram, and Facebook accounts in minutes. Unified inbox, single dashboard." },
-            { step: "02", title: "Import Your Contacts", body: "Upload CSVs, sync from your CRM, or build segments by tag, region, or engagement history.", highlight: true },
-            { step: "03", title: "Compose & Automate", body: "Send broadcasts with one click or design recurring journeys with our visual automation builder." },
+            { step: "01", title: "Connect Your Channels", body: "Link WhatsApp Business, Instagram, and Facebook accounts in minutes. Unified inbox, single dashboard.", img: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=600&h=400&fit=crop&auto=format" },
+            { step: "02", title: "Import Your Contacts", body: "Upload CSVs, sync from your CRM, or build segments by tag, region, or engagement history.", highlight: true, img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=400&fit=crop&auto=format" },
+            { step: "03", title: "Compose & Automate", body: "Send broadcasts with one click or design recurring journeys with our visual automation builder.", img: "https://images.unsplash.com/photo-1507925921958-8a62f3d1a50d?w=600&h=400&fit=crop&auto=format" },
           ].map(p => (
-            <div key={p.step} className={`rounded-3xl p-8 ${p.highlight ? "bg-gradient-deep text-primary-foreground shadow-deep" : "bg-card shadow-card"}`}>
-              <div className="font-display text-6xl font-semibold opacity-30">{p.step}</div>
-              <h3 className="font-display text-2xl font-semibold mt-4">{p.title}</h3>
-              <p className={`mt-3 text-sm leading-relaxed ${p.highlight ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{p.body}</p>
+            <div key={p.step} className={`rounded-3xl overflow-hidden ${p.highlight ? "bg-gradient-deep text-primary-foreground shadow-deep" : "bg-card shadow-card"}`}>
+              <div className="aspect-video w-full overflow-hidden">
+                <img src={p.img} alt={p.title} className="w-full h-full object-cover" />
+              </div>
+              <div className="p-8">
+                <div className="font-display text-6xl font-semibold opacity-30">{p.step}</div>
+                <h3 className="font-display text-2xl font-semibold mt-4">{p.title}</h3>
+                <p className={`mt-3 text-sm leading-relaxed ${p.highlight ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{p.body}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -151,18 +148,18 @@ export default function Landing() {
       <section className="max-w-7xl mx-auto px-8 pb-16">
         <div className="bg-gradient-deep text-primary-foreground rounded-3xl p-16 text-center shadow-deep">
           <h2 className="font-display text-5xl font-semibold leading-tight">Ready to blueprint your <br />communication?</h2>
-          <p className="text-primary-foreground/75 mt-4">Join over 500 enterprises building the future of automated messaging on the Real customer App platform.</p>
+          <p className="text-primary-foreground/75 mt-4">Join over 500 enterprises building the future of automated messaging on the My Real Customer App platform.</p>
           <div className="flex justify-center gap-3 mt-8">
             <Link href="/app" className="bg-card text-foreground px-6 py-3.5 rounded-xl font-semibold">Build Your First Bot</Link>
-            <button className="bg-primary-glow/40 border border-primary-foreground/20 px-6 py-3.5 rounded-xl font-semibold">View API Documentation</button>
+            <Link href="/contact" className="bg-primary-glow/40 border border-primary-foreground/20 px-6 py-3.5 rounded-xl font-semibold hover:bg-primary-glow/60 transition">Contact Us</Link>
           </div>
         </div>
       </section>
 
       <footer className="max-w-7xl mx-auto px-8 py-10 border-t border-border flex flex-wrap justify-between gap-4 text-sm text-muted-foreground">
         <div>
-          <div className="font-display text-foreground font-semibold">Real customer App</div>
-          <div className="text-xs mt-1">© 2024 Real customer App. All rights reserved.</div>
+          <div className="font-display text-foreground font-semibold">My Real Customer App</div>
+          <div className="text-xs mt-1">© {new Date().getFullYear()} My Real Customer App. All rights reserved.</div>
         </div>
         <div className="flex gap-6">
           <a>Privacy Policy</a><a>Terms of Service</a><a>Security</a><a>Status</a>

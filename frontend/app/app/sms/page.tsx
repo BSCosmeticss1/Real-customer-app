@@ -121,7 +121,7 @@ export default function SMSPage() {
           </div>
           <div>
             <h1 className="font-display text-3xl font-semibold">Send SMS</h1>
-            <p className="text-muted-foreground text-sm">Reach contacts or any external phone numbers instantly via Real customer App.</p>
+            <p className="text-muted-foreground text-sm">Reach contacts or any external phone numbers instantly via My Real Customer App.</p>
           </div>
         </div>
 

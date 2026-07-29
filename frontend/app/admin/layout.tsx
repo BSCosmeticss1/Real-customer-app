@@ -20,7 +20,7 @@ export default function AdminLayout({
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5"><path d="M12 2L4 22h3l1.5-4h7L17 22h3L12 2zm-2.2 13L12 8.5 14.2 15H9.8z" fill="currentColor"/></svg>
           </div>
           <div>
-            <div className="font-display text-lg font-semibold text-foreground leading-none">Real customer App</div>
+            <div className="font-display text-lg font-semibold text-foreground leading-none">My Real Customer App</div>
             <div className="label-eyebrow mt-1.5">Platform Admin</div>
           </div>
         </div>
