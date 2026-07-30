@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, CheckCircle2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Suspense } from "react";
 
 function VerifyEmailContent() {
@@ -51,14 +52,19 @@ function VerifyEmailContent() {
 
   const resendOtp = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/resend-verification`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      alert("Verification code resent!");
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Verification code resent successfully!");
+      } else {
+        toast.error(data.message || "Failed to resend code");
+      }
     } catch (err) {
-      alert("Failed to resend code");
+      toast.error("Something went wrong. Please try again.");
     }
   };
 
