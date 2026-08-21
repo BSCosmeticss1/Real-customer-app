@@ -2,13 +2,18 @@ services:
   - type: web
     name: real-customer-frontend
     env: node
+    rootDir: frontend
     buildCommand: npm install && npm run build
     startCommand: npm start
     plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
 
   - type: web
     name: real-customer-backend
     env: node
+    rootDir: backend
     buildCommand: npm install && npm run build
     startCommand: npm start
     plan: starter
