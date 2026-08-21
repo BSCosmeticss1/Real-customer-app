@@ -1,6 +1,7 @@
 const { prisma } = require('../config/db');
 const { paginateResult } = require('../middleware/paginate');
 const { ROLES } = require('../middleware/auth');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // Helper to get the user ID to filter by
 const getTargetUserId = (currentUser, targetUserId) => {
@@ -166,6 +167,18 @@ exports.createProduct = async (req, res, next) => {
     const product = await prisma.product.create({
       data: { ...req.body, userId: targetUserId },
     });
+
+    await logBookKeeping(
+      targetUserId,
+      'inventory',
+      'product',
+      product.id,
+      'CREATED',
+      `Product "${product.name}" created`,
+      { name: product.name, sku: product.sku, quantity: product.quantity },
+      req.user.name || req.user.role,
+    );
+
     res.status(201).json({ success: true, data: product });
   } catch (err) { next(err); }
 };
@@ -191,6 +204,18 @@ exports.updateProduct = async (req, res, next) => {
     });
     if (product.count === 0) return res.status(404).json({ success: false, message: 'Product not found' });
     const updatedProduct = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+    await logBookKeeping(
+      updatedProduct.userId,
+      'inventory',
+      'product',
+      req.params.id,
+      'UPDATED',
+      `Product "${updatedProduct.name}" updated`,
+      { changes: req.body },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, data: updatedProduct });
   } catch (err) { next(err); }
 };
@@ -215,6 +240,19 @@ exports.deleteProduct = async (req, res, next) => {
       data: { isActive: false },
     });
     if (product.count === 0) return res.status(404).json({ success: false, message: 'Product not found' });
+
+    const deletedProduct = await prisma.product.findFirst({ where });
+    await logBookKeeping(
+      deletedProduct.userId,
+      'inventory',
+      'product',
+      req.params.id,
+      'DELETED',
+      `Product "${deletedProduct.name}" removed`,
+      { name: deletedProduct.name, sku: deletedProduct.sku },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, message: 'Product removed' });
   } catch (err) { next(err); }
 };
@@ -283,7 +321,7 @@ exports.addMovement = async (req, res, next) => {
       }),
       prisma.stockMovement.create({
         data: {
-          userId: product.userId, // Use the product's owner ID
+          userId: product.userId,
           productId,
           type,
           quantity: Number(quantity),
@@ -291,11 +329,31 @@ exports.addMovement = async (req, res, next) => {
           newQuantity,
           reference,
           notes,
-          createdBy: req.user.id, // Who actually made the change
+          createdBy: req.user.id,
         },
         include: { product: { select: { name: true, sku: true } } },
       }),
     ]);
+
+    await logBookKeeping(
+      product.userId,
+      'inventory',
+      'stock_movement',
+      movement.id,
+      type === 'incoming' ? 'STOCK_IN' : 'STOCK_OUT',
+      `Stock ${type}: ${product.name} (${product.sku}) qty ${quantity}`,
+      {
+        productId,
+        productName: product.name,
+        sku: product.sku,
+        type,
+        quantity: Number(quantity),
+        previousQuantity,
+        newQuantity,
+        reference,
+      },
+      req.user.name || req.user.role,
+    );
 
     res.status(201).json({ success: true, data: movement });
   } catch (err) { next(err); }

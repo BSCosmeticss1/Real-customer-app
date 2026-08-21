@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { prisma } = require('../config/db');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // Get all bookings for a user
 exports.getBookings = async (req, res, next) => {
@@ -119,7 +119,18 @@ exports.createBooking = async (req, res, next) => {
         notes
       }
     });
-    
+
+    await logBookKeeping(
+      userId,
+      'bookings',
+      'booking',
+      booking.id,
+      'CREATED',
+      `Booking ${booking.bookingNumber} created for ${customerName}`,
+      { bookingNumber, customerName, service, amount, status: booking.status },
+      req.user?.name || req.user?.role || 'system',
+    );
+
     res.status(201).json(booking);
   } catch (error) {
     next(error);
@@ -144,15 +155,26 @@ exports.updateBooking = async (req, res, next) => {
         notes
       }
     });
-    
+
     if (booking.count === 0) {
       return res.status(404).json({ message: 'Booking not found' });
     }
-    
+
     const updatedBooking = await prisma.booking.findFirst({
       where: { id, userId }
     });
-    
+
+    await logBookKeeping(
+      userId,
+      'bookings',
+      'booking',
+      id,
+      'UPDATED',
+      `Booking ${updatedBooking.bookingNumber} updated`,
+      { bookingNumber: updatedBooking.bookingNumber, status: updatedBooking.status },
+      req.user?.name || req.user?.role || 'system',
+    );
+
     res.json(updatedBooking);
   } catch (error) {
     next(error);
@@ -168,11 +190,22 @@ exports.deleteBooking = async (req, res, next) => {
     const booking = await prisma.booking.deleteMany({
       where: { id, userId }
     });
-    
+
     if (booking.count === 0) {
       return res.status(404).json({ message: 'Booking not found' });
     }
-    
+
+    await logBookKeeping(
+      userId,
+      'bookings',
+      'booking',
+      id,
+      'DELETED',
+      `Booking deleted`,
+      { customerName: req.body?.customerName || 'Unknown' },
+      req.user?.name || req.user?.role || 'system',
+    );
+
     res.json({ message: 'Booking deleted successfully' });
   } catch (error) {
     next(error);

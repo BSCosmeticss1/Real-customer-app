@@ -8,6 +8,7 @@ const ROLES = {
   INVENTORY_MANAGER: 'INVENTORY_MANAGER',
   FINANCE_MANAGER: 'FINANCE_MANAGER',
   MESSAGING_MANAGER: 'MESSAGING_MANAGER',
+  AUDITOR: 'AUDITOR',
 };
 
 const ROLE_LABELS = {
@@ -15,12 +16,14 @@ const ROLE_LABELS = {
   INVENTORY_MANAGER: 'Inventory Manager',
   FINANCE_MANAGER: 'Finance Manager',
   MESSAGING_MANAGER: 'Messaging Manager',
+  AUDITOR: 'External Auditor',
 };
 
 const ROLE_DESCRIPTIONS = {
   INVENTORY_MANAGER: 'Access to Products and Stock Movements only',
   FINANCE_MANAGER: 'Access to Invoices, Expenses and Cash Flow only',
   MESSAGING_MANAGER: 'Access to Messaging, Contacts and Templates only',
+  AUDITOR: 'Read-only access to Book Keeping and operations records',
 };
 
 const ROLE_PERMISSIONS = {
@@ -28,17 +31,25 @@ const ROLE_PERMISSIONS = {
   INVENTORY_MANAGER: ['inventory', 'stock_movements'],
   FINANCE_MANAGER: ['invoices', 'expenses', 'cashflow', 'dashboard'],
   MESSAGING_MANAGER: ['messaging', 'contacts', 'templates', 'logs'],
+  AUDITOR: ['book-keeping'],
 };
 
 const ALL_SUB_MODULES = [
   "messaging", "sms", "email", "automation",
   "contacts", "inventory",
-  "book-keeping", "sales-reporting", "analytics"
+  "book-keeping", "sales-reporting", "bookingReporting", "analytics", "finance"
 ];
 
+// Each tier is a superset of the previous one
 const PLAN_MODULES = {
-  standard: ["messaging", "contacts", "book-keeping", "sales-reporting", "email"],
-  premium: ALL_SUB_MODULES,
+  // Basic: core communication + bookings
+  standard: ["messaging", "email", "contacts", "book-keeping", "sales-reporting"],
+  // Premium: standard + automation, stock, booking reports & analytics
+  premium: [
+    "messaging", "email", "contacts", "book-keeping", "sales-reporting",
+    "sms", "automation", "inventory", "bookingReporting", "analytics",
+  ],
+  // Enterprise: everything, including finance
   enterprise: ALL_SUB_MODULES,
 };
 

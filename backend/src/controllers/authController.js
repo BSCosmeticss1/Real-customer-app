@@ -9,6 +9,7 @@ const ROLES = {
   INVENTORY_MANAGER: 'INVENTORY_MANAGER',
   FINANCE_MANAGER: 'FINANCE_MANAGER',
   MESSAGING_MANAGER: 'MESSAGING_MANAGER',
+  AUDITOR: 'AUDITOR',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

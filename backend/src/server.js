@@ -7,6 +7,8 @@ if (process.env.NODE_ENV === 'development') {
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
@@ -21,6 +23,29 @@ if (!fs.existsSync(path.join(__dirname, '../uploads'))) {
 }
 
 const app = express();
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// General rate limit — protects the whole API from abuse
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' },
+});
+app.use(generalLimiter);
+
+// Stricter limit for auth endpoints — protects against brute-force login/OTP attempts
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many auth attempts, please try again later.' },
+});
 
 // ==================== CORS ====================
 const allowedOrigins = [
@@ -52,8 +77,11 @@ app.use(
 
 app.options('*', cors());
 
-// Paystack webhook
-app.use('/api/payments/paystack/webhook', express.raw({ type: 'application/json' }));
+// Paystack webhook — raw body required for signature verification (must be
+// mounted before express.json(), and the path must match the real route:
+// '/payments/paystack/webhook', not '/api/payments/paystack/webhook' —
+// this app's routes are mounted without an /api prefix, see below.
+app.use('/payments/paystack/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -70,7 +98,7 @@ app.get('/health', (req, res) => {
 });
 
 // ==================== ROUTES (Without extra /api prefix) ====================
-app.use('/auth', require('./routes/auth'));
+app.use('/auth', authLimiter, require('./routes/auth'));
 app.use('/contacts', require('./routes/contacts'));
 app.use('/messages', require('./routes/messages'));
 app.use('/templates', require('./routes/templates'));
@@ -82,7 +110,7 @@ app.use('/payments', require('./routes/payments'));
 app.use('/users', require('./routes/users'));
 app.use('/onboarding', require('./routes/onboarding'));
 app.use('/bookings', require('./routes/bookings'));
-app.use('/sales-reports', require('./routes/salesReports'));
+app.use('/book-keeping', require('./routes/bookKeeping'));
 
 // 404 Handler
 app.use((req, res) => {

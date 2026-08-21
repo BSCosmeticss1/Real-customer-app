@@ -2,6 +2,7 @@ const axios = require('axios');
 const { prisma } = require('../config/db');
 const { paginateResult } = require('../middleware/paginate');
 const crypto = require('crypto');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // @route POST /payments/paystack/initialize
 exports.initializePaystack = async (req, res, next) => {
@@ -47,6 +48,17 @@ exports.initializePaystack = async (req, res, next) => {
       },
     });
 
+    await logBookKeeping(
+      req.user.id,
+      'cashflow',
+      'payment',
+      reference,
+      'INITIALIZED',
+      `Payment initialized: ${description || 'Invoice payment'}`,
+      { amount, currency: 'NGN', method: 'paystack', reference, invoiceId },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, data: response.data.data });
   } catch (err) {
     if (err.response?.data) {
@@ -59,12 +71,12 @@ exports.initializePaystack = async (req, res, next) => {
 // @route POST /payments/paystack/initialize-subscription
 exports.initializeSubscription = async (req, res, next) => {
   try {
-    const { planType, interval, amount } = req.body;
-    if (!planType || !['standard', 'premium', 'enterprise'].includes(planType)) {
-      return res.status(400).json({ success: false, message: 'Valid planType (standard, premium, or enterprise) is required' });
+    const { planType, selectedFeatures, amount } = req.body; // 'monthly' or 'yearly', selected features, and total amount
+    if (!planType || !['monthly', 'yearly'].includes(planType)) {
+      return res.status(400).json({ success: false, message: 'Valid planType (monthly or yearly) is required' });
     }
-    if (!interval || !['monthly', 'yearly'].includes(interval)) {
-      return res.status(400).json({ success: false, message: 'Valid interval (monthly or yearly) is required' });
+    if (!selectedFeatures || !Array.isArray(selectedFeatures) || selectedFeatures.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one feature must be selected' });
     }
     if (!amount || typeof amount !== 'number') {
       return res.status(400).json({ success: false, message: 'Valid amount is required' });
@@ -91,7 +103,7 @@ exports.initializeSubscription = async (req, res, next) => {
         metadata: { 
           userId: req.user.id, 
           planType, 
-          interval,
+          selectedFeatures,
           isSubscription: true 
         },
       },
@@ -106,10 +118,21 @@ exports.initializeSubscription = async (req, res, next) => {
         currency: 'NGN',
         method: 'paystack',
         status: 'pending',
-        description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} ${interval} Subscription`,
-        metadata: { planType, interval, isSubscription: true },
+        description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} Subscription - ${selectedFeatures.length} features`,
+        metadata: { planType, selectedFeatures, isSubscription: true },
       },
     });
+
+    await logBookKeeping(
+      req.user.id,
+      'cashflow',
+      'payment',
+      reference,
+      'INITIALIZED',
+      `Subscription payment initialized: ${planType} plan`,
+      { amount, planType, selectedFeatures },
+      req.user.name || req.user.role,
+    );
 
     res.json({ success: true, data: response.data.data });
   } catch (err) {
@@ -143,6 +166,17 @@ exports.verifyPaystack = async (req, res, next) => {
       },
     });
 
+    await logBookKeeping(
+      payment.userId,
+      'cashflow',
+      'payment',
+      payment.reference,
+      txData.status === 'success' ? 'PAID' : 'FAILED',
+      `Payment ${txData.status}: ${payment.description || 'Payment verification'}`,
+      { amount: payment.amount, currency: payment.currency, method: payment.method, status: txData.status },
+      req.user.name || req.user.role,
+    );
+
     // Mark invoice as paid if linked
     if (payment?.invoiceId && txData.status === 'success') {
       await prisma.invoice.update({
@@ -154,39 +188,21 @@ exports.verifyPaystack = async (req, res, next) => {
     // Handle subscription completion
     if (txData.metadata?.isSubscription && txData.status === 'success') {
       const expiresAt = new Date();
-      const planType = txData.metadata.planType;
-      const interval = txData.metadata.interval || 'monthly';
-      
-      if (interval === 'monthly') {
+      if (txData.metadata.planType === 'monthly') {
         expiresAt.setMonth(expiresAt.getMonth() + 1);
       } else {
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       }
-
-      const planFeatures = {
-        standard: ["messaging", "contacts", "book-keeping", "sales-reporting", "email"],
-        premium: [
-          "messaging", "sms", "email", "automation",
-          "contacts", "inventory",
-          "book-keeping", "sales-reporting", "analytics"
-        ],
-        enterprise: [
-          "messaging", "sms", "email", "automation",
-          "contacts", "inventory",
-          "book-keeping", "sales-reporting", "analytics"
-        ],
-      };
 
       await prisma.user.update({
         where: { id: txData.metadata.userId },
         data: {
           subscription: {
             status: 'active',
-            plan: planType,
-            interval: interval,
+            plan: txData.metadata.planType,
             expiresAt: expiresAt.toISOString(),
             paystackCustomerCode: txData.customer.customer_code,
-            selectedFeatures: (planFeatures[planType] || planFeatures.premium),
+            selectedFeatures: txData.metadata.selectedFeatures || [],
           },
           onboardingStatus: 'COMPLETED',
         },
@@ -205,21 +221,64 @@ exports.verifyPaystack = async (req, res, next) => {
 // @route POST /payments/paystack/webhook
 exports.paystackWebhook = async (req, res, next) => {
   try {
-    const hash = crypto
-      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-      .update(JSON.stringify(req.body))
-      .digest('hex');
+    // req.body arrives as a raw Buffer here (see the express.raw() mount in
+    // server.js, scoped to this exact path) — HMAC verification must run
+    // against those exact bytes, not a re-serialized JS object, or every
+    // signature check fails.
+    if (!Buffer.isBuffer(req.body)) {
+      return res.status(400).json({ success: false, message: 'Invalid webhook body' });
+    }
+    const rawBody = req.body;
 
+    let payload;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      return res.status(400).json({ success: false, message: 'Malformed webhook payload' });
+    }
+
+    const { event, data } = payload || {};
+
+    // Users can configure their own Paystack secret key (see initializePaystack),
+    // so verify against whichever key actually signed this payment, falling
+    // back to the platform default for payments initialized without one.
+    let secretKey = process.env.PAYSTACK_SECRET_KEY;
+    let payment = null;
+    if (data?.reference) {
+      payment = await prisma.payment.findUnique({
+        where: { reference: data.reference },
+        include: { user: { select: { apiKeys: true } } },
+      });
+      if (payment?.user?.apiKeys?.paystackKey) {
+        secretKey = payment.user.apiKeys.paystackKey;
+      }
+    }
+
+    if (!secretKey) {
+      return res.status(400).json({ success: false, message: 'Paystack not configured' });
+    }
+
+    const hash = crypto.createHmac('sha512', secretKey).update(rawBody).digest('hex');
     if (hash !== req.headers['x-paystack-signature']) {
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
-    const { event, data } = req.body;
-    if (event === 'charge.success') {
+    if (event === 'charge.success' && payment) {
       await prisma.payment.update({
         where: { reference: data.reference },
         data: { status: 'success', paystackData: data, paidAt: new Date() },
       });
+
+      await logBookKeeping(
+        payment.userId,
+        'cashflow',
+        'payment',
+        payment.reference,
+        'PAID',
+        `Payment confirmed via webhook: ${payment.description || 'Payment'}`,
+        { amount: payment.amount, currency: payment.currency, reference: payment.reference },
+        'Paystack Webhook',
+      );
     }
 
     res.json({ success: true });

@@ -4,6 +4,7 @@ const { sendEmail } = require('../services/emailService');
 const { paginateResult } = require('../middleware/paginate');
 const schedule = require('node-schedule');
 const { getPlanLimits } = require('./userController');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // Store scheduled jobs in memory
 const scheduledJobs = {};
@@ -77,7 +78,18 @@ exports.sendNow = async (req, res, next) => {
     await prisma.messageLog.createMany({
       data: logs,
     });
-    
+
+    await logBookKeeping(
+      req.user.id,
+      'messaging',
+      'message',
+      req.user.id,
+      'SENT',
+      `Messages sent via ${platform}: ${results.sent} sent, ${results.failed} failed`,
+      { platform, sent: results.sent, failed: results.failed, contactIds },
+      req.user.name || req.user.role,
+    );
+
     console.log('[sendNow] Done! Results:', results);
     res.json({ success: true, data: results, message: `Sent: ${results.sent}, Failed: ${results.failed}` });
   } catch (err) {
@@ -112,6 +124,17 @@ exports.scheduleMessage = async (req, res, next) => {
 
     // Schedule the job
     scheduleJob(scheduled, req.user.id);
+
+    await logBookKeeping(
+      req.user.id,
+      'messaging',
+      'scheduled_message',
+      scheduled.id,
+      'CREATED',
+      `Scheduled message created for ${platform}`,
+      { platform, scheduledAt: scheduled.scheduledAt, recurrence: scheduled.recurrence, contactCount: contactIds?.length || 0 },
+      req.user.name || req.user.role,
+    );
 
     res.status(201).json({ success: true, data: scheduled });
   } catch (err) { next(err); }
@@ -252,6 +275,18 @@ exports.cancelScheduled = async (req, res, next) => {
       scheduledJobs[req.params.id].cancel();
       delete scheduledJobs[req.params.id];
     }
+
+    await logBookKeeping(
+      req.user.id,
+      'messaging',
+      'scheduled_message',
+      req.params.id,
+      'CANCELLED',
+      `Scheduled message cancelled`,
+      {},
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, message: 'Scheduled message cancelled' });
   } catch (err) { next(err); }
 };

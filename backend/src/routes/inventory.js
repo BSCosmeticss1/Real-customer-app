@@ -5,8 +5,9 @@ const {
   addMovement, getMovements, exportProducts, getInventoryUsers,
 } = require('../controllers/inventoryController');
 const { protect, requireRole } = require('../middleware/auth');
+const { requireFeature } = require('../middleware/features');
 
-router.use(protect, requireRole('INVENTORY_MANAGER'));
+router.use(protect, requireRole('INVENTORY_MANAGER'), requireFeature('inventory'));
 
 router.get('/users', getInventoryUsers);
 router.get('/movements',  getMovements);

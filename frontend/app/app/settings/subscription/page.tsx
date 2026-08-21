@@ -14,14 +14,25 @@ const ALL_FEATURES = [
   { id: "inventory", name: "Inventory", description: "Product & stock management" },
   { id: "book-keeping", name: "Book Keeping", description: "Bookings & appointments" },
   { id: "sales-reporting", name: "Sales Reporting", description: "Sales tracking & reports" },
+  { id: "bookingReporting", name: "Booking Reporting", description: "Booking reports & analytics" },
+  { id: "finance", name: "Finance", description: "Invoices, expenses & cashflow" },
   { id: "analytics", name: "Analytics", description: "Insights & charts" },
 ];
 
 const PLAN_MODULES = {
-  standard: ["messaging", "contacts", "book-keeping", "sales-reporting", "email"],
-  premium: ALL_FEATURES.map(f => f.id),
+  // Basic: core communication + bookings
+  standard: ["messaging", "email", "contacts", "book-keeping", "sales-reporting"],
+  // Premium: standard + automation, stock, booking reports & analytics
+  premium: [
+    "messaging", "email", "contacts", "book-keeping", "sales-reporting",
+    "sms", "automation", "inventory", "bookingReporting", "analytics",
+  ],
+  // Enterprise: everything, including finance
   enterprise: ALL_FEATURES.map(f => f.id),
 };
+
+const FEATURE_MAP = Object.fromEntries(ALL_FEATURES.map((f) => [f.id, f]));
+const PLAN_ORDER = ["standard", "premium", "enterprise"];
 
 const PLANS = [
   {
@@ -39,6 +50,7 @@ const PLANS = [
     name: "Premium",
     description: "Complete access for growing businesses",
     icon: Zap,
+    popular: true,
     monthlyPrice: 50000,
     yearlyPrice: 480000,
     features: PLAN_MODULES.premium,
@@ -122,7 +134,8 @@ export default function SubscriptionSettings() {
         body: JSON.stringify({ 
           planType: selectedPlan,
           interval: billingCycle,
-          amount: calculateTotal()
+          amount: calculateTotal(),
+          selectedFeatures: PLAN_MODULES[selectedPlan as keyof typeof PLAN_MODULES] || []
         }),
       });
       const data = await res.json();
@@ -218,6 +231,11 @@ export default function SubscriptionSettings() {
                   Current Plan
                 </div>
               )}
+              {plan.popular && !isCurrentPlan && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-glow text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                  Most Popular
+                </div>
+              )}
               <div className="flex items-center gap-3 mb-4">
                 <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                   <Icon className="h-6 w-6" />
@@ -235,18 +253,28 @@ export default function SubscriptionSettings() {
 
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Features</div>
-                <div className="space-y-2">
-                  {ALL_FEATURES.map((feature) => {
-                    const isIncluded = plan.features.includes(feature.id);
-                    if (!isIncluded) return null;
-                    return (
-                      <div key={feature.id} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-success" />
-                        <span className="text-foreground">{feature.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {(() => {
+                  const idx = PLAN_ORDER.indexOf(plan.id);
+                  const prev = idx > 0 ? PLANS.find((p) => p.id === PLAN_ORDER[idx - 1]) : null;
+                  const extraFeatures = prev
+                    ? plan.features.filter((f) => !PLAN_MODULES[prev.id].includes(f))
+                    : plan.features;
+                  return (
+                    <div className="space-y-2">
+                      {prev && (
+                        <p className="text-xs text-muted-foreground">
+                          Everything in {prev.name}, plus:
+                        </p>
+                      )}
+                      {extraFeatures.map((fid) => (
+                        <div key={fid} className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-success shrink-0" />
+                          <span className="text-foreground">{FEATURE_MAP[fid]?.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );

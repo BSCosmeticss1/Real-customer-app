@@ -3,6 +3,7 @@ const { paginateResult } = require('../middleware/paginate');
 const csv = require('csv-parser');
 const fs = require('fs');
 const { getPlanLimits } = require('./userController');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // @route GET /contacts
 exports.getContacts = async (req, res, next) => {
@@ -71,6 +72,18 @@ exports.createContact = async (req, res, next) => {
     const contact = await prisma.contact.create({
       data: { ...req.body, userId: req.user.id },
     });
+
+    await logBookKeeping(
+      req.user.id,
+      'contacts',
+      'contact',
+      contact.id,
+      'CREATED',
+      `Contact "${contact.name}" created`,
+      { name: contact.name, email: contact.email, phone: contact.phone },
+      req.user.name || req.user.role,
+    );
+
     res.status(201).json({ success: true, data: contact });
   } catch (err) { next(err); }
 };
@@ -82,10 +95,22 @@ exports.updateContact = async (req, res, next) => {
       where: { id: req.params.id, userId: req.user.id },
       data: req.body,
     });
-    
+
     if (contact.count === 0) return res.status(404).json({ success: false, message: 'Contact not found' });
-    
+
     const updatedContact = await prisma.contact.findUnique({ where: { id: req.params.id } });
+
+    await logBookKeeping(
+      req.user.id,
+      'contacts',
+      'contact',
+      req.params.id,
+      'UPDATED',
+      `Contact "${updatedContact.name}" updated`,
+      { name: updatedContact.name },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, data: updatedContact });
   } catch (err) { next(err); }
 };
@@ -93,10 +118,28 @@ exports.updateContact = async (req, res, next) => {
 // @route DELETE /contacts/:id
 exports.deleteContact = async (req, res, next) => {
   try {
-    const contact = await prisma.contact.deleteMany({
+    const contact = await prisma.contact.findFirst({
       where: { id: req.params.id, userId: req.user.id },
     });
-    if (contact.count === 0) return res.status(404).json({ success: false, message: 'Contact not found' });
+
+    const result = await prisma.contact.deleteMany({
+      where: { id: req.params.id, userId: req.user.id },
+    });
+    if (result.count === 0) return res.status(404).json({ success: false, message: 'Contact not found' });
+
+    if (contact) {
+      await logBookKeeping(
+        req.user.id,
+        'contacts',
+        'contact',
+        req.params.id,
+        'DELETED',
+        `Contact "${contact.name}" deleted`,
+        { name: contact.name },
+        req.user.name || req.user.role,
+      );
+    }
+
     res.json({ success: true, message: 'Contact deleted' });
   } catch (err) { next(err); }
 };

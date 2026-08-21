@@ -5,6 +5,33 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Building2, Phone, Globe, MapPin, Check, Shield, Zap, Crown } from "lucide-react";
 
+const FEATURE_NAMES: Record<string, string> = {
+  messaging: "Messaging",
+  sms: "SMS",
+  email: "Email",
+  automation: "Automation",
+  contacts: "Contacts",
+  inventory: "Inventory",
+  "book-keeping": "Book Keeping",
+  "sales-reporting": "Sales Reporting",
+  bookingReporting: "Booking Reporting",
+  finance: "Finance",
+  analytics: "Analytics",
+};
+
+// Each tier is a superset of the previous one
+const PLAN_MODULES: Record<string, string[]> = {
+  // Basic: core communication + bookings
+  standard: ["messaging", "email", "contacts", "book-keeping", "sales-reporting"],
+  // Premium: standard + automation, stock, booking reports & analytics
+  premium: [
+    "messaging", "email", "contacts", "book-keeping", "sales-reporting",
+    "sms", "automation", "inventory", "bookingReporting", "analytics",
+  ],
+  // Enterprise: everything, including finance
+  enterprise: Object.keys(FEATURE_NAMES),
+};
+
 const PLANS = [
   {
     id: "standard",
@@ -13,7 +40,7 @@ const PLANS = [
     icon: Shield,
     monthlyPrice: 25000,
     yearlyPrice: 240000,
-    features: ["Messaging", "Contacts", "Book Keeping", "Sales Reporting", "Email"],
+    features: PLAN_MODULES.standard.map((f) => FEATURE_NAMES[f]),
     limits: { users: 3, contacts: 1000, messages: 5000 }
   },
   {
@@ -21,27 +48,20 @@ const PLANS = [
     name: "Premium",
     description: "Complete access for growing businesses",
     icon: Zap,
+    popular: true,
     monthlyPrice: 50000,
     yearlyPrice: 480000,
-    features: [
-      "Messaging", "SMS", "Email", "Automation",
-      "Contacts", "Inventory",
-      "Book Keeping", "Sales Reporting", "Analytics"
-    ],
+    features: PLAN_MODULES.premium.map((f) => FEATURE_NAMES[f]),
     limits: { users: 10, contacts: 10000, messages: 50000 }
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    description: "Advanced features and dedicated support",
+    description: "Advanced features, finance & dedicated support",
     icon: Crown,
     monthlyPrice: 100000,
     yearlyPrice: 960000,
-    features: [
-      "Messaging", "SMS", "Email", "Automation",
-      "Contacts", "Inventory",
-      "Book Keeping", "Sales Reporting", "Analytics"
-    ],
+    features: PLAN_MODULES.enterprise.map((f) => FEATURE_NAMES[f]),
     limits: { users: 999, contacts: 99999, messages: 999999 }
   },
 ];
@@ -117,7 +137,8 @@ export default function Onboarding() {
         body: JSON.stringify({ 
           planType: selectedPlan,
           interval: billingCycle,
-          amount: calculateTotal()
+          amount: calculateTotal(),
+          selectedFeatures: PLAN_MODULES[selectedPlan] || []
         }),
       });
 
@@ -232,17 +253,22 @@ export default function Onboarding() {
 
               {/* Plan cards */}
               <div className="grid sm:grid-cols-3 gap-6">
-                {PLANS.map((plan) => {
-                  const Icon = plan.icon;
-                  const isSelected = selectedPlan === plan.id;
-                  const price = billingCycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+              {PLANS.map((plan) => {
+                const Icon = plan.icon;
+                const isSelected = selectedPlan === plan.id;
+                const price = billingCycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
 
-                  return (
-                    <div
-                      key={plan.id}
-                      onClick={() => setSelectedPlan(plan.id)}
-                      className={`relative cursor-pointer bg-card border-2 rounded-3xl p-6 transition-all duration-300 flex flex-col h-full ${isSelected ? 'border-primary shadow-deep scale-[1.02]' : 'border-border hover:border-primary/50'}`}
-                    >
+                return (
+                  <div
+                    key={plan.id}
+                    onClick={() => setSelectedPlan(plan.id)}
+                    className={`relative cursor-pointer bg-card border-2 rounded-3xl p-6 transition-all duration-300 flex flex-col h-full ${isSelected ? 'border-primary shadow-deep scale-[1.02]' : 'border-border hover:border-primary/50'}`}
+                  >
+                    {plan.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-glow text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                        Most Popular
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                         <Icon className="h-6 w-6" />

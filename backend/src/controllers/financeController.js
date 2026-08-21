@@ -1,5 +1,6 @@
 const { prisma } = require('../config/db');
 const { paginateResult } = require('../middleware/paginate');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // =================== INVOICES ===================
 
@@ -79,9 +80,20 @@ exports.createInvoice = async (req, res, next) => {
       include: { items: true },
     });
 
-    res.status(201).json({ 
-      success: true, 
-      data: invoice 
+    await logBookKeeping(
+      req.user.id,
+      'invoices',
+      'invoice',
+      invoice.id,
+      'CREATED',
+      `Invoice ${invoice.invoiceNumber} created for ${client}`,
+      { invoiceNumber, client, total, status: invoice.status },
+      req.user.name || req.user.role,
+    );
+
+    res.status(201).json({
+      success: true,
+      data: invoice
     });
 
   } catch (err) {
@@ -122,16 +134,45 @@ exports.updateInvoice = async (req, res, next) => {
       data,
       include: { items: true },
     });
-    
+
+    await logBookKeeping(
+      req.user.id,
+      'invoices',
+      'invoice',
+      req.params.id,
+      'UPDATED',
+      `Invoice ${invoice.invoiceNumber} updated`,
+      { invoiceNumber: invoice.invoiceNumber, total: invoice.total },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, data: invoice });
   } catch (err) { next(err); }
 };
 
 exports.deleteInvoice = async (req, res, next) => {
   try {
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id, userId: req.user.id },
+    });
+
     await prisma.invoice.deleteMany({
       where: { id: req.params.id, userId: req.user.id },
     });
+
+    if (invoice) {
+      await logBookKeeping(
+        req.user.id,
+        'invoices',
+        'invoice',
+        req.params.id,
+        'DELETED',
+        `Invoice ${invoice.invoiceNumber} deleted`,
+        { invoiceNumber: invoice.invoiceNumber, client: invoice.client },
+        req.user.name || req.user.role,
+      );
+    }
+
     res.json({ success: true, message: 'Invoice deleted' });
   } catch (err) { next(err); }
 };
@@ -143,6 +184,18 @@ exports.markInvoicePaid = async (req, res, next) => {
       data: { status: 'paid', paidAt: new Date() },
       include: { items: true },
     });
+
+    await logBookKeeping(
+      req.user.id,
+      'invoices',
+      'invoice',
+      req.params.id,
+      'PAID',
+      `Invoice ${invoice.invoiceNumber} marked as paid`,
+      { invoiceNumber: invoice.invoiceNumber, total: invoice.total },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, data: invoice });
   } catch (err) { next(err); }
 };
@@ -179,6 +232,18 @@ exports.createExpense = async (req, res, next) => {
     const expense = await prisma.expense.create({
       data: { ...req.body, userId: req.user.id },
     });
+
+    await logBookKeeping(
+      req.user.id,
+      'expenses',
+      'expense',
+      expense.id,
+      'CREATED',
+      `Expense recorded: ${expense.description}`,
+      { description: expense.description, amount: expense.amount, category: expense.category },
+      req.user.name || req.user.role,
+    );
+
     res.status(201).json({ success: true, data: expense });
   } catch (err) { next(err); }
 };
@@ -189,15 +254,45 @@ exports.updateExpense = async (req, res, next) => {
       where: { id: req.params.id },
       data: req.body,
     });
+
+    await logBookKeeping(
+      req.user.id,
+      'expenses',
+      'expense',
+      req.params.id,
+      'UPDATED',
+      `Expense updated: ${expense.description}`,
+      { description: expense.description, amount: expense.amount },
+      req.user.name || req.user.role,
+    );
+
     res.json({ success: true, data: expense });
   } catch (err) { next(err); }
 };
 
 exports.deleteExpense = async (req, res, next) => {
   try {
+    const expense = await prisma.expense.findFirst({
+      where: { id: req.params.id, userId: req.user.id },
+    });
+
     await prisma.expense.deleteMany({
       where: { id: req.params.id, userId: req.user.id },
     });
+
+    if (expense) {
+      await logBookKeeping(
+        req.user.id,
+        'expenses',
+        'expense',
+        req.params.id,
+        'DELETED',
+        `Expense deleted: ${expense.description}`,
+        { description: expense.description, amount: expense.amount },
+        req.user.name || req.user.role,
+      );
+    }
+
     res.json({ success: true, message: 'Expense deleted' });
   } catch (err) { next(err); }
 };

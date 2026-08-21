@@ -1,4 +1,5 @@
 const { prisma } = require('../config/db');
+const { logBookKeeping } = require('../services/bookKeepingService');
 
 // Get all sales reports for a user
 exports.getSalesReports = async (req, res, next) => {
@@ -117,6 +118,17 @@ exports.createSalesReport = async (req, res, next) => {
       }
     });
 
+    await logBookKeeping(
+      userId,
+      'sales-reporting',
+      'sales_report',
+      report.id,
+      'CREATED',
+      `Sales report #${report.serialNumber} created for ${customerName}`,
+      { serialNumber: report.serialNumber, customerName, item, amountPaid: report.amountPaid, paid: report.paid },
+      req.user.name || req.user.role,
+    );
+
     res.status(201).json(report);
   } catch (error) {
     next(error);
@@ -165,6 +177,17 @@ exports.updateSalesReport = async (req, res, next) => {
       }
     });
 
+    await logBookKeeping(
+      userId,
+      'sales-reporting',
+      'sales_report',
+      id,
+      'UPDATED',
+      `Sales report #${updated.serialNumber} updated`,
+      { serialNumber: updated.serialNumber, customerName: updated.customerName },
+      req.user.name || req.user.role,
+    );
+
     res.json(updated);
   } catch (error) {
     next(error);
@@ -186,6 +209,17 @@ exports.deleteSalesReport = async (req, res, next) => {
     }
 
     await prisma.salesReport.delete({ where: { id } });
+
+    await logBookKeeping(
+      userId,
+      'sales-reporting',
+      'sales_report',
+      id,
+      'DELETED',
+      `Sales report #${report.serialNumber} deleted`,
+      { serialNumber: report.serialNumber, customerName: report.customerName },
+      req.user.name || req.user.role,
+    );
 
     res.json({ success: true, message: 'Sales report deleted successfully' });
   } catch (error) {

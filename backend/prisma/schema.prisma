@@ -15,6 +15,7 @@ enum Role {
   INVENTORY_MANAGER
   FINANCE_MANAGER
   MESSAGING_MANAGER
+  AUDITOR
 }
 
 model User {
@@ -58,6 +59,7 @@ model User {
   payments          Payment[]
   bookings          Booking[]
   salesReports      SalesReport[]
+  bookKeeping       BookKeeping[]
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -327,10 +329,30 @@ model SalesReport {
   date             DateTime  @default(now())
   accountHistory   String?
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([userId, date(sort: Desc)])
   @@index([userId, customerName])
   @@map("sales_reports")
+}
+
+model BookKeeping {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module        String    // messaging, inventory, bookings, invoices, expenses, cashflow
+  entityType    String    // message, contact, product, stock_movement, booking, invoice, expense
+  entityId      String
+  action        String    // CREATED, UPDATED, DELETED, SENT, PAID, etc.
+  description   String
+  metadata      Json?     // additional details
+  performedBy   String?   // user name or role who performed action
+
+  createdAt     DateTime  @default(now())
+
+  @@index([userId, module])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, entityType])
+  @@map("book_keeping")
 }
