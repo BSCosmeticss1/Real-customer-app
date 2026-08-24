@@ -24,6 +24,11 @@ if (!fs.existsSync(path.join(__dirname, '../uploads'))) {
 
 const app = express();
 
+// Render (and most PaaS) sit behind a reverse proxy and forward the real
+// client IP via X-Forwarded-For. Enable this so express-rate-limit can
+// identify users correctly instead of throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+app.set('trust proxy', 1);
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
