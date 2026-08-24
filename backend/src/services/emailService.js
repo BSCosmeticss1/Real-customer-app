@@ -3,7 +3,10 @@ const nodemailer = require('nodemailer');
 // ─── Nodemailer Transport Configuration ──────────────────────────────────────
 // Using SMTP settings from .env
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // STARTTLS (not implicit SSL)
+  requireTLS: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: (process.env.SMTP_PASS || '').replace(/\s/g, ''),
