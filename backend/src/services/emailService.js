@@ -11,6 +11,9 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
+  // Force IPv4: Render's outbound can't reach Gmail over IPv6 (ENETUNREACH),
+  // and nodemailer otherwise prefers the AAAA record.
+  family: 4,
 });
 
 // Verify connection configuration
