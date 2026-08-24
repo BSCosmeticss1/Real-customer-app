@@ -46,6 +46,18 @@ transporter.verify(function (error) {
  * @param {string} htmlContent - HTML content of the email
  */
 exports.sendEmail = async (to, subject, htmlContent) => {
+  // DEV MODE: SMTP is often blocked locally (e.g. Gmail), so instead of
+  // hanging on a timeout we print the message to the console. The OTP / link
+  // is right there for local testing. Production still uses real SMTP.
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`\n📧 [DEV MODE] Email to ${to}`);
+    console.log(`   Subject: ${subject}`);
+    console.log("   Body:");
+    console.log(htmlContent);
+    console.log("");
+    return { dev: true, messageId: "dev-console" };
+  }
+
   try {
     const info = await transporter.sendMail({
       from: `"${process.env.EMAIL_SENDER_NAME || "My Real Customer App"}" <${process.env.EMAIL_SENDER_ADDRESS || process.env.SMTP_USER}>`,
