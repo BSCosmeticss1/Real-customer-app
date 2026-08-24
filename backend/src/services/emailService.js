@@ -1,20 +1,25 @@
 const nodemailer = require("nodemailer");
 
-// ─── Email delivery ───────────────────────────────────────────────────────────
-// Render blocks outbound SMTP (ports 465/587) to Gmail, so we deliver over HTTPS
-// via Resend's REST API (port 443) when RESEND_API_KEY is set. Otherwise we fall
-// back to Gmail SMTP (nodemailer). Either way, delivery failures are NON-FATAL —
-// they are logged and swallowed so they never break signup/login flows.
+// ─── Email delivery (SMTP) ───────────────────────────────────────────────────
+// Provider-agnostic SMTP. Configure via environment variables so you can point
+// it at any host Render can reach (Gmail is blocked from Render / this network,
+// so use e.g. SendGrid, Mailgun, Mailtrap, or your own domain host).
+//
+//   SMTP_HOST     (default smtp.gmail.com)
+//   SMTP_PORT     (default 587)
+//   SMTP_SECURE   "true" for implicit SSL (port 465), otherwise STARTTLS
+//   SMTP_USER
+//   SMTP_PASS
+//   EMAIL_SENDER_NAME / EMAIL_SENDER_ADDRESS
+//
+// Delivery failures are NON-FATAL: they are logged and swallowed so they never
+// break signup / login / forgot-password flows.
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_ADDRESS = process.env.EMAIL_FROM || "onboarding@resend.dev";
-
-// Fallback Gmail SMTP transport (used only when RESEND_API_KEY is absent)
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  requireTLS: true,
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure:
+    process.env.SMTP_SECURE === "true" || Number(process.env.SMTP_PORT) === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: (process.env.SMTP_PASS || "").replace(/\s/g, ""),
@@ -22,61 +27,28 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
+  // Force IPv4 — avoids unreachable IPv6 routes (ENETUNREACH) on some hosts.
   family: 4,
 });
 
-// Only probe Gmail if we're not using Resend (avoids a 20s timeout at startup)
-if (!RESEND_API_KEY) {
-  transporter.verify(function (error) {
-    if (error) {
-      console.error("📧 SMTP Verification Failed:", error.message);
-    } else {
-      console.log("📧 SMTP Server is ready to take our messages");
-    }
-  });
-}
+transporter.verify(function (error) {
+  if (error) {
+    console.warn("📧 SMTP not reachable:", error.message);
+  } else {
+    console.log("📧 SMTP Server is ready to take our messages");
+  }
+});
 
 /**
- * Send an email. Never throws — returns true on success, null on failure.
+ * Send an email. Never throws — returns the info on success, null on failure.
  * @param {string} to - Recipient email
  * @param {string} subject - Email subject
  * @param {string} htmlContent - HTML content of the email
  */
 exports.sendEmail = async (to, subject, htmlContent) => {
-  if (RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: FROM_ADDRESS,
-          to: [to],
-          subject,
-          html: htmlContent,
-        }),
-      });
-
-      if (!res.ok) {
-        const detail = await res.text();
-        console.error(`❌ Resend email failed (${res.status}): ${detail}`);
-        return null;
-      }
-
-      console.log(`📧 Email sent to ${to} via Resend`);
-      return true;
-    } catch (err) {
-      console.error(`❌ Resend delivery failed to ${to}: ${err.message}`);
-      return null;
-    }
-  }
-
-  // Fallback: Gmail SMTP (non-fatal)
   try {
     const info = await transporter.sendMail({
-      from: `"${process.env.EMAIL_SENDER_NAME || "My Real Customer App"}" <${process.env.SMTP_USER}>`,
+      from: `"${process.env.EMAIL_SENDER_NAME || "My Real Customer App"}" <${process.env.EMAIL_SENDER_ADDRESS || process.env.SMTP_USER}>`,
       to,
       subject,
       html: htmlContent,
