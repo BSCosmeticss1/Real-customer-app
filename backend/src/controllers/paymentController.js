@@ -71,9 +71,14 @@ exports.initializePaystack = async (req, res, next) => {
 // @route POST /payments/paystack/initialize-subscription
 exports.initializeSubscription = async (req, res, next) => {
   try {
-    const { planType, selectedFeatures, amount } = req.body; // 'monthly' or 'yearly', selected features, and total amount
-    if (!planType || !['monthly', 'yearly'].includes(planType)) {
-      return res.status(400).json({ success: false, message: 'Valid planType (monthly or yearly) is required' });
+    const { planType, interval, selectedFeatures, amount } = req.body;
+    const VALID_PLANS = ['standard', 'premium', 'enterprise'];
+    const VALID_INTERVALS = ['monthly', 'yearly'];
+    if (!planType || !VALID_PLANS.includes(planType)) {
+      return res.status(400).json({ success: false, message: 'Valid planType (standard, premium or enterprise) is required' });
+    }
+    if (!interval || !VALID_INTERVALS.includes(interval)) {
+      return res.status(400).json({ success: false, message: 'Valid interval (monthly or yearly) is required' });
     }
     if (!selectedFeatures || !Array.isArray(selectedFeatures) || selectedFeatures.length === 0) {
       return res.status(400).json({ success: false, message: 'At least one feature must be selected' });
@@ -103,6 +108,7 @@ exports.initializeSubscription = async (req, res, next) => {
         metadata: { 
           userId: req.user.id, 
           planType, 
+          interval,
           selectedFeatures,
           isSubscription: true 
         },
@@ -119,7 +125,7 @@ exports.initializeSubscription = async (req, res, next) => {
         method: 'paystack',
         status: 'pending',
         description: `${planType.charAt(0).toUpperCase() + planType.slice(1)} Subscription - ${selectedFeatures.length} features`,
-        metadata: { planType, selectedFeatures, isSubscription: true },
+        metadata: { planType, interval, selectedFeatures, isSubscription: true },
       },
     });
 
@@ -187,8 +193,9 @@ exports.verifyPaystack = async (req, res, next) => {
 
     // Handle subscription completion
     if (txData.metadata?.isSubscription && txData.status === 'success') {
+      const interval = txData.metadata.interval || 'monthly';
       const expiresAt = new Date();
-      if (txData.metadata.planType === 'monthly') {
+      if (interval === 'monthly') {
         expiresAt.setMonth(expiresAt.getMonth() + 1);
       } else {
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
@@ -200,6 +207,7 @@ exports.verifyPaystack = async (req, res, next) => {
           subscription: {
             status: 'active',
             plan: txData.metadata.planType,
+            interval,
             expiresAt: expiresAt.toISOString(),
             paystackCustomerCode: txData.customer.customer_code,
             selectedFeatures: txData.metadata.selectedFeatures || [],
